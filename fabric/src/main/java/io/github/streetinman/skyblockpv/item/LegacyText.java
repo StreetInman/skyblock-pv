@@ -7,6 +7,7 @@ import net.minecraft.network.chat.Style;
 
 /** Turns "§6§lLEGENDARY" style strings into real text components. */
 public final class LegacyText {
+	private static final String COLOR_CODES = "0123456789abcdef";
 	private LegacyText() {
 	}
 
@@ -22,13 +23,14 @@ public final class LegacyText {
 		for (int i = 0; i < legacy.length(); i++) {
 			char c = legacy.charAt(i);
 			if (c == '§' && i + 1 < legacy.length()) {
-				ChatFormatting format = ChatFormatting.getByCode(Character.toLowerCase(legacy.charAt(i + 1)));
+				char code = Character.toLowerCase(legacy.charAt(i + 1));
+				ChatFormatting format = ChatFormatting.getByCode(code);
 				if (format != null) {
 					if (!run.isEmpty()) {
 						result.append(Component.literal(run.toString()).setStyle(style));
 						run.setLength(0);
 					}
-					style = apply(style, format);
+					style = apply(style, format, COLOR_CODES.indexOf(code) >= 0);
 					i++;
 					continue;
 				}
@@ -41,9 +43,9 @@ public final class LegacyText {
 		return result;
 	}
 
-	private static Style apply(Style style, ChatFormatting format) {
+	private static Style apply(Style style, ChatFormatting format, boolean isColor) {
 		// A colour code or §r resets bold/italic/etc., as in the 1.8 client.
-		if (format.isColor()) return Style.EMPTY.withItalic(false).withColor(format);
+		if (isColor) return Style.EMPTY.withItalic(false).withColor(format);
 		return switch (format) {
 			case BOLD -> style.withBold(true);
 			case ITALIC -> style.withItalic(true);
