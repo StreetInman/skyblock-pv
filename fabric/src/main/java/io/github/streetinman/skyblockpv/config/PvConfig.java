@@ -22,10 +22,14 @@ public final class PvConfig {
 	public String apiKey = "";
 	public String apiBaseUrl = HypixelClient.HYPIXEL_BASE_URL;
 
-	// Dungeon calculator. Everything else (perks, Hecatomb, Scarf, Expert Ring, Derpy) is read
-	// from the profile automatically; these cover what the API can't see.
+	// Dungeon calculator. Perks, Hecatomb, Scarf, Expert Ring, shard attributes and Derpy are read
+	// from the profile automatically; these cover what the API can't see or gets wrong.
 	/** An active global dungeon XP boost, e.g. 20 for +20%. */
 	public double dungeonGlobalBoostPercent = 0;
+	/** Catacombs Graduate shard attribute level (0–10), or -1 to read it from the profile. */
+	public int dungeonGraduateLevel = -1;
+	/** Catacombs Explorer shard attribute level (0–10), or -1 to read it from the profile. */
+	public int dungeonExplorerLevel = -1;
 	/** Any other class XP bonus you have that the API doesn't expose. */
 	public double dungeonExtraClassBoostPercent = 0;
 	/** Share of a run's class XP that the classes you didn't play receive. */

@@ -19,6 +19,8 @@ import io.github.streetinman.skyblockpv.core.nbt.NbtCompound;
  * @param classPerkLevels   essence-shop perk level per class, +2% class XP per level
  * @param mayorMultiplier   1.5 while Derpy is mayor, otherwise 1
  * @param globalMultiplier  manual: active global dungeon XP boost (1.0 = none)
+ * @param graduateLevel     Catacombs Graduate shard attribute level, +2% class XP per level
+ * @param explorerLevel     Catacombs Explorer shard attribute level, +1% Catacombs XP per level
  * @param extraClassBonus   manual: any other class XP bonus not visible through the API
  * @param teamShare         fraction of a run's class XP that the classes you didn't play receive
  */
@@ -29,6 +31,8 @@ public record XpBoosts(
 		Map<DungeonClass, Integer> classPerkLevels,
 		double mayorMultiplier,
 		double globalMultiplier,
+		int graduateLevel,
+		int explorerLevel,
 		double extraClassBonus,
 		double teamShare) {
 
@@ -39,18 +43,30 @@ public record XpBoosts(
 		return hecatombLevel <= 0 ? 0 : 0.004 + 0.0016 * Math.min(hecatombLevel, 10);
 	}
 
+	public double graduate() {
+		return 0.02 * graduateLevel;
+	}
+
+	public double explorer() {
+		return 0.01 * explorerLevel;
+	}
+
 	public double classPerk(DungeonClass c) {
 		return classPerkLevels.getOrDefault(c, 0) * 0.02;
 	}
 
 	/**
 	 * Works out boosts from the profile: perks from {@code player_data.perks}, Hecatomb from any
-	 * item the API shows, Scarf accessories and the Expert Ring from the accessory bag.
+	 * item the API shows, Scarf accessories and the Expert Ring from the accessory bag, and shard
+	 * attributes from {@code attributes.stacks}.
 	 *
-	 * @param mayorName current SkyBlock mayor, or null if unknown
+	 * @param mayorName        current SkyBlock mayor, or null if unknown
+	 * @param graduateOverride Catacombs Graduate level to use instead of the detected one, or -1
+	 * @param explorerOverride Catacombs Explorer level to use instead of the detected one, or -1
 	 */
-	public static XpBoosts detect(DungeonData dungeons, Inventories inv, String mayorName,
-			double globalMultiplier, double extraClassBonus, double teamShare) {
+	public static XpBoosts detect(DungeonData dungeons, Inventories inv, Map<String, Integer> attributeStacks,
+			String mayorName, double globalMultiplier, int graduateOverride, int explorerOverride,
+			double extraClassBonus, double teamShare) {
 		Map<DungeonClass, Integer> perks = new EnumMap<>(DungeonClass.class);
 		for (DungeonClass c : DungeonClass.values()) {
 			perks.put(c, dungeons.perks().getOrDefault(c.perkKey, 0));
@@ -75,7 +91,10 @@ public record XpBoosts(
 		}
 
 		double mayor = "Derpy".equalsIgnoreCase(mayorName) ? 1.5 : 1.0;
-		return new XpBoosts(hecatomb, scarf, ring, perks, mayor, globalMultiplier, extraClassBonus, teamShare);
+		int graduate = graduateOverride >= 0 ? graduateOverride : ShardAttributes.graduateLevel(attributeStacks);
+		int explorer = explorerOverride >= 0 ? explorerOverride : ShardAttributes.explorerLevel(attributeStacks);
+		return new XpBoosts(hecatomb, scarf, ring, perks, mayor, globalMultiplier,
+				Math.min(graduate, 10), Math.min(explorer, 10), extraClassBonus, teamShare);
 	}
 
 	private static Stream<SkyblockItem> allItems(Inventories inv) {

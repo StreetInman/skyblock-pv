@@ -31,7 +31,7 @@ public final class DungeonCalculator {
 		double ring = b.expertRing() ? 0.10 : 0;
 		double hec = b.hecatomb();
 		double mayorBonus = b.mayorMultiplier() - 1;
-		double multiplier = 0.95 + ring + hec + n * ((b.expertRing() ? 0.024 : 0.022) + hec / 50);
+		double multiplier = 0.95 + ring + hec + b.explorer() + n * ((b.expertRing() ? 0.024 : 0.022) + hec / 50);
 		if (mayorBonus > 0) multiplier += mayorBonus + n / 100.0;
 		// Small epsilon so float error (e.g. 504000.0000001) does not round up a whole XP.
 		return Math.ceil(baseXp * multiplier * b.globalMultiplier() - 1e-6);
@@ -39,7 +39,7 @@ public final class DungeonCalculator {
 
 	/** Class XP for the class you played; the others get {@link XpBoosts#teamShare()} of their own amount. */
 	public static double classXpPerRun(double baseXp, DungeonClass c, XpBoosts b) {
-		double bonus = 1 + 2 * b.hecatomb() + b.classPerk(c) + b.scarfBonus() + b.extraClassBonus();
+		double bonus = 1 + 2 * b.hecatomb() + b.classPerk(c) + b.scarfBonus() + b.graduate() + b.extraClassBonus();
 		return baseXp * bonus * b.globalMultiplier() * b.mayorMultiplier();
 	}
 

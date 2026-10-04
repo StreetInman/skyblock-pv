@@ -40,6 +40,7 @@ class ProfileParserTest {
 		assertEquals(1_000_000.0, m.purse());
 		assertEquals(240, m.fairySouls());
 		assertEquals(55_172_425.0, m.skillXp().get("FARMING"));
+		assertEquals(Map.of("SHARD_SCARF", 32, "SHARD_BONZO", 4), m.attributeStacks());
 	}
 
 	@Test
@@ -182,6 +183,8 @@ class ProfileParserTest {
 		JsonObject slayer = com.google.gson.JsonParser.parseString(
 				"{\"slayer_bosses\": {\"zombie\": {\"xp\": 1500000}, \"wolf\": {\"xp\": 2000}}}").getAsJsonObject();
 		m.add("slayer", slayer);
+		m.add("attributes", com.google.gson.JsonParser.parseString(
+				"{\"stacks\": {\"SHARD_SCARF\": 32, \"SHARD_BONZO\": 4}}").getAsJsonObject());
 
 		if (inventoryApi) {
 			JsonObject inv = new JsonObject();

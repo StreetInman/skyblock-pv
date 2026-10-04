@@ -3,7 +3,7 @@
   "id": "skyblockpv",
   "version": "${version}",
   "name": "SkyBlock Profile Viewer",
-  "description": "View any Hypixel SkyBlock player's stats, gear, wardrobe and trophy fishing in game with /pv.",
+  "description": "View any Hypixel SkyBlock player's stats, gear, storage, dungeons and trophy fishing in game with /pv.",
   "authors": ["StreetInman"],
   "contact": {
     "sources": "https://github.com/StreetInman/skyblock-pv",

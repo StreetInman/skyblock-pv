@@ -93,7 +93,18 @@ public final class ProfileParser {
 				parseInventories(obj(member, "inventory")),
 				parseTrophyFish(obj(member, "trophy_fish")),
 				parseDungeons(member),
-				parseSlayers(path(member, "slayer", "slayer_bosses")));
+				parseSlayers(path(member, "slayer", "slayer_bosses")),
+				parseAttributeStacks(path(member, "attributes", "stacks")));
+	}
+
+	static Map<String, Integer> parseAttributeStacks(JsonObject stacks) {
+		Map<String, Integer> result = new TreeMap<>();
+		if (stacks != null) {
+			for (Map.Entry<String, JsonElement> e : stacks.entrySet()) {
+				if (e.getValue().isJsonPrimitive()) result.put(e.getKey(), e.getValue().getAsInt());
+			}
+		}
+		return Collections.unmodifiableMap(result);
 	}
 
 	static DungeonData parseDungeons(JsonObject member) {

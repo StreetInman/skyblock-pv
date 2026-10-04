@@ -14,7 +14,7 @@ that player's stats and gear, without leaving the game.
 | Skills | Every skill with level and progress to the next level |
 | Dungeons | Catacombs and class levels, secrets, runs, best M7 S+, and an **M7 calculator** (below) |
 | Inv | Armor, equipment (necklace, cloak, belt, gloves), inventory and hotbar |
-| Wardrobe | Every wardrobe slot, with the worn set marked |
+| Storage | Every ender chest page and backpack, one per page. Flip through with **<** and **>** |
 | Accs | Accessory bag |
 | Trophy | All 18 trophy fish with bronze/silver/gold/diamond counts and your Trophy Hunter rank |
 
@@ -37,11 +37,14 @@ from the profile automatically:
 - essence-shop class perks (Toxophilite, Unbridled Rage, Heart of Gold, Cold Efficiency, Diamond in the Rough)
 - the highest Hecatomb level on any visible item
 - Scarf's Studies, Thesis or Grimoire, and the Catacombs Expert Ring in the accessory bag
+- the **Catacombs Graduate** (Scarf shard, +2% class XP per level) and **Catacombs Explorer**
+  (Bonzo shard, +1% Catacombs XP per level) attributes from the profile's hunting shards
 - Derpy as the current mayor
 
 Hover the calculator to see exactly which boosts were found. Boosts the API can't see go in
 `config/skyblock-pv.json`: `dungeonGlobalBoostPercent`, `dungeonExtraClassBoostPercent`, and
-`dungeonTeamShare`.
+`dungeonTeamShare`. If the shard levels it shows are wrong, set `dungeonGraduateLevel` and
+`dungeonExplorerLevel` (0–10; `-1` means read from the profile).
 
 ## Is it allowed on Hypixel?
 
@@ -92,7 +95,7 @@ Requires JDK 25.
 The project has two modules:
 
 - **`core/`** is plain Java with no Minecraft code. It holds the API clients, the NBT decoder,
-  the profile parser (wardrobe, equipment, trophy fish…) and skill math, and it's unit-tested.
+  the profile parser (equipment, storage, trophy fish…) and skill math, and it's unit-tested.
 - **`fabric/`** is the mod itself: the `/pv` command, the config file and the GUI.
 
 See [docs/plan.md](docs/plan.md) for the full design.
@@ -102,8 +105,9 @@ See [docs/plan.md](docs/plan.md) for the full design.
 - [x] `/pv` command, API client, profile parsing, tabs listed above
 - [x] Real item icons (via [legacy-item-dfu](https://github.com/AzureAaron/legacy-item-dfu))
 - [x] Dungeons tab with M7 calculator, slayers
-- [ ] Storage tab (ender chest, backpacks), pets
-- [ ] Loadouts (pending: confirm the API exposes them, using `/pvdump`)
+- [x] Storage tab (ender chest, backpacks)
+- [ ] Pets
+- [ ] Loadouts tab (the API exposes them under `member.loadout`)
 - [ ] Player skin render on the overview
 - [ ] API proxy + production key so players don't need their own key
 - [ ] First release on Modrinth

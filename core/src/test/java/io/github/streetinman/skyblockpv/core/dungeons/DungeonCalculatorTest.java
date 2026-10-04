@@ -56,6 +56,54 @@ class DungeonCalculatorTest {
 	}
 
 	@Test
+	void shardAttributesBoostXp() {
+		XpBoosts grad = new XpBoosts(0, 0, false, Map.of(), 1.0, 1.0, 10, 0, 0, XpBoosts.DEFAULT_TEAM_SHARE);
+		assertEquals(360_000, DungeonCalculator.classXpPerRun(300_000, DungeonClass.MAGE, grad), 1e-6);
+		XpBoosts explorer = new XpBoosts(0, 0, false, Map.of(), 1.0, 1.0, 0, 10, 0, XpBoosts.DEFAULT_TEAM_SHARE);
+		assertEquals(315_000, DungeonCalculator.catacombsXpPerRun(300_000, 0, explorer));
+	}
+
+	@Test
+	void shardLevelsFollowEpicThresholds() {
+		assertEquals(0, ShardAttributes.levelFromStacks(0));
+		assertEquals(1, ShardAttributes.levelFromStacks(1));
+		assertEquals(3, ShardAttributes.levelFromStacks(5));
+		assertEquals(9, ShardAttributes.levelFromStacks(31));
+		assertEquals(10, ShardAttributes.levelFromStacks(32));
+		assertEquals(10, ShardAttributes.levelFromStacks(500));
+	}
+
+	/**
+	 * A late-game player (the case that prompted the Graduate fix): Hecatomb X, Grimoire,
+	 * perks 5, Graduate X. Other calculators put this at about 1,560 runs.
+	 */
+	@Test
+	void lateGameClassAverageMatchesOtherCalculators() {
+		Map<DungeonClass, Double> xp = new EnumMap<>(DungeonClass.class);
+		double[] levels = {46.61, 49.02, 47.75, 47.21, 46.29};
+		DungeonClass[] order = {DungeonClass.HEALER, DungeonClass.MAGE, DungeonClass.BERSERK, DungeonClass.ARCHER, DungeonClass.TANK};
+		for (int i = 0; i < order.length; i++) xp.put(order[i], xpAt(levels[i]));
+		Map<DungeonClass, Integer> perks = new EnumMap<>(DungeonClass.class);
+		for (DungeonClass c : DungeonClass.values()) perks.put(c, 5);
+
+		XpBoosts withGrad = new XpBoosts(10, 0.06, true, perks, 1.0, 1.0, 10, 0, 0, XpBoosts.DEFAULT_TEAM_SHARE);
+		XpBoosts noGrad = new XpBoosts(10, 0.06, true, perks, 1.0, 1.0, 0, 0, 0, XpBoosts.DEFAULT_TEAM_SHARE);
+		int with = DungeonCalculator.classAverage50(xp, 300_000, withGrad).totalRuns();
+		int without = DungeonCalculator.classAverage50(xp, 300_000, noGrad).totalRuns();
+		assertTrue(with > 1_450 && with < 1_700, "with Graduate: " + with);
+		assertTrue(without > with * 1.1, "without Graduate: " + without);
+	}
+
+	private static double xpAt(double level) {
+		double lo = 0, hi = DungeonLevels.XP_FOR_50;
+		for (int i = 0; i < 100; i++) {
+			double mid = (lo + hi) / 2;
+			if (DungeonLevels.level(mid) < level) lo = mid; else hi = mid;
+		}
+		return lo;
+	}
+
+	@Test
 	void classAverage50FromScratchSplitsRunsEvenly() {
 		var plan = DungeonCalculator.classAverage50(Map.of(), 300_000, NONE);
 		int sum = plan.runsAs().values().stream().mapToInt(Integer::intValue).sum();
@@ -96,7 +144,8 @@ class DungeonCalculatorTest {
 		DungeonData dungeons = new DungeonData(0, Map.of(), null, 0, Map.of(), Map.of(), Map.of(),
 				Map.of("toxophilite", 3, "cold_efficiency", 5));
 
-		XpBoosts b = XpBoosts.detect(dungeons, inv, "Derpy", 1.0, 0, XpBoosts.DEFAULT_TEAM_SHARE);
+		XpBoosts b = XpBoosts.detect(dungeons, inv, Map.of("shard_scarf", 20, "SHARD_BONZO", 3), "Derpy",
+				1.0, -1, -1, 0, XpBoosts.DEFAULT_TEAM_SHARE);
 
 		assertEquals(7, b.hecatombLevel());
 		assertEquals(0.0152, b.hecatomb(), 1e-9);
@@ -106,14 +155,18 @@ class DungeonCalculatorTest {
 		assertEquals(0.10, b.classPerk(DungeonClass.MAGE), 1e-9);
 		assertEquals(0.0, b.classPerk(DungeonClass.TANK), 1e-9);
 		assertEquals(1.5, b.mayorMultiplier());
+		assertEquals(8, b.graduateLevel());
+		assertEquals(2, b.explorerLevel());
 
 		XpBoosts none = XpBoosts.detect(dungeons, new Inventories(null, null, null, null, null, null, Map.of(), Set.of()),
-				"Aatrox", 1.0, 0, XpBoosts.DEFAULT_TEAM_SHARE);
+				Map.of(), "Aatrox", 1.0, 10, -1, 0, XpBoosts.DEFAULT_TEAM_SHARE);
 		assertFalse(none.expertRing());
+		assertEquals(10, none.graduateLevel(), "a config override wins over the profile");
+		assertEquals(0, none.explorerLevel());
 		assertEquals(1.0, none.mayorMultiplier());
 	}
 
 	private static XpBoosts boosts(int hecatomb, double scarf, boolean ring, Map<DungeonClass, Integer> perks, double mayor) {
-		return new XpBoosts(hecatomb, scarf, ring, perks, mayor, 1.0, 0, XpBoosts.DEFAULT_TEAM_SHARE);
+		return new XpBoosts(hecatomb, scarf, ring, perks, mayor, 1.0, 0, 0, 0, XpBoosts.DEFAULT_TEAM_SHARE);
 	}
 }

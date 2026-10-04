@@ -1,7 +1,6 @@
 package io.github.streetinman.skyblockpv.gui;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -29,8 +28,6 @@ import io.github.streetinman.skyblockpv.core.model.SkyblockItem;
 import io.github.streetinman.skyblockpv.core.model.Slayer;
 import io.github.streetinman.skyblockpv.core.model.TrophyFish;
 import io.github.streetinman.skyblockpv.core.model.TrophyFishing;
-import io.github.streetinman.skyblockpv.core.model.Wardrobe;
-import io.github.streetinman.skyblockpv.core.model.WardrobeSlot;
 import io.github.streetinman.skyblockpv.item.ItemStacks;
 
 /**
@@ -38,16 +35,18 @@ import io.github.streetinman.skyblockpv.item.ItemStacks;
  * panel shows "Loading…" or the error.
  */
 public class PvScreen extends Screen {
-	private static final int PANEL_WIDTH = 330;
-	private static final int PANEL_HEIGHT = 210;
+	private static final int PANEL_WIDTH = 370;
+	private static final int PANEL_HEIGHT = 220;
 	private static final int SLOT = 18;
 	private static final int WHITE = 0xFFFFFFFF;
 	private static final int GREY = 0xFFAAAAAA;
 	private static final int ACCESSORIES_PER_PAGE = 54;
+	/** The API stores every ender chest page back to back; the game shows 45 slots per page. */
+	private static final int ENDER_CHEST_PAGE = 45;
 	private static final String[] ROMAN = {"0", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"};
 
 	private enum Tab {
-		OVERVIEW("Stats"), SKILLS("Skills"), DUNGEONS("Dungeons"), INVENTORY("Inv"), WARDROBE("Wardrobe"),
+		OVERVIEW("Stats"), SKILLS("Skills"), DUNGEONS("Dungeons"), INVENTORY("Inv"), STORAGE("Storage"),
 		ACCESSORIES("Accs"), TROPHY_FISH("Trophy");
 
 		final String label;
@@ -61,12 +60,17 @@ public class PvScreen extends Screen {
 	private record DungeonPlan(XpBoosts boosts, int runsToCata50, DungeonCalculator.ClassPlan classPlan) {
 	}
 
+	/** One flippable page of the Storage tab: an ender chest page or a backpack. */
+	private record StoragePage(String title, List<SkyblockItem> items) {
+	}
+
 	private final String requestedName;
 	private final PvConfig config;
 	private final ItemStacks.Cache stacks = new ItemStacks.Cache();
 	private ProfileService.Lookup lookup;
 	private Profile profile;
 	private DungeonPlan dungeonPlan;
+	private List<StoragePage> storagePages = List.of();
 	private String error;
 	private Tab tab = Tab.OVERVIEW;
 	private int page;
@@ -96,12 +100,27 @@ public class PvScreen extends Screen {
 		profile = p;
 		page = 0;
 		MemberData m = p.member();
-		XpBoosts boosts = XpBoosts.detect(m.dungeons(), m.inventories(), lookup.mayor(),
-				1 + config.dungeonGlobalBoostPercent / 100.0, config.dungeonExtraClassBoostPercent / 100.0, config.dungeonTeamShare);
+		XpBoosts boosts = XpBoosts.detect(m.dungeons(), m.inventories(), m.attributeStacks(), lookup.mayor(),
+				1 + config.dungeonGlobalBoostPercent / 100.0, config.dungeonGraduateLevel, config.dungeonExplorerLevel,
+				config.dungeonExtraClassBoostPercent / 100.0, config.dungeonTeamShare);
 		DungeonData d = m.dungeons();
 		dungeonPlan = new DungeonPlan(boosts,
 				DungeonCalculator.runsToCatacombs50(d.catacombsXp(), d.masterCompletions().getOrDefault(7, 0), DungeonCalculator.M7_BASE_XP, boosts),
 				DungeonCalculator.classAverage50(d.classXp(), DungeonCalculator.M7_BASE_XP, boosts));
+		storagePages = storagePages(m.inventories());
+	}
+
+	private static List<StoragePage> storagePages(Inventories inv) {
+		List<StoragePage> pages = new ArrayList<>();
+		List<SkyblockItem> ender = inv.enderChest();
+		if (ender != null) {
+			for (int from = 0, n = 1; from < ender.size(); from += ENDER_CHEST_PAGE, n++) {
+				pages.add(new StoragePage("Ender Chest " + n, ender.subList(from, Math.min(ender.size(), from + ENDER_CHEST_PAGE))));
+			}
+		}
+		// Backpack keys are 0-based slot numbers in the storage menu.
+		inv.backpacks().forEach((slot, items) -> pages.add(new StoragePage("Backpack " + (slot + 1), items)));
+		return List.copyOf(pages);
 	}
 
 	@Override
@@ -163,7 +182,7 @@ public class PvScreen extends Screen {
 				case SKILLS -> drawSkills(g, contentTop);
 				case DUNGEONS -> drawDungeons(g, contentTop, mouseX, mouseY);
 				case INVENTORY -> drawInventory(g, contentTop, mouseX, mouseY);
-				case WARDROBE -> drawWardrobe(g, contentTop, mouseX, mouseY);
+				case STORAGE -> drawStorage(g, contentTop, mouseX, mouseY);
 				case ACCESSORIES -> drawAccessories(g, contentTop, mouseX, mouseY);
 				case TROPHY_FISH -> drawTrophyFish(g, contentTop);
 			}
@@ -204,7 +223,7 @@ public class PvScreen extends Screen {
 			slayers.add((level == s.maxLevel() ? "§6" : "§f") + s.displayName + " " + level + " §7" + compact(xp) + " XP");
 		}
 		slayers.add("§7Total: " + compact(totalSlayerXp) + " XP");
-		drawLines(g, slayers, left + 175, y);
+		drawLines(g, slayers, Math.max(left + 180, left + 8 + widest(stats) + 16), y);
 	}
 
 	private void drawSkills(GuiGraphicsExtractor g, int y) {
@@ -230,27 +249,39 @@ public class PvScreen extends Screen {
 		DungeonData d = profile.member().dungeons();
 		int x = left + 8;
 
-		double cata = d.catacombsLevel();
-		g.text(font, "§cCatacombs " + decimal(cata), x, y, WHITE, false);
-		drawBar(g, x, y + 10, 150, cata >= 50 ? 1 : cata - Math.floor(cata), cata >= 50);
-		y += 18;
+		List<String> classLines = new ArrayList<>();
 		for (DungeonClass c : DungeonClass.values()) {
 			double level = d.classLevel(c);
 			String marker = c == d.selectedClass() ? " §a◆" : "";
-			g.text(font, (level >= 50 ? "§6" : "§f") + c.displayName() + " " + decimal(level) + marker, x, y, WHITE, false);
-			drawBar(g, x + 90, y + 2, 60, level >= 50 ? 1 : level - Math.floor(level), level >= 50);
+			classLines.add((level >= 50 ? "§6" : "§f") + c.displayName() + " " + decimal(level) + marker);
+		}
+		// Bars start after the widest class line so long names never run into them.
+		int barX = x + widest(classLines) + 6;
+		int barWidth = 50;
+
+		Long best = d.masterFastestSPlusMs().get(7);
+		List<String> stats = List.of(
+				"§7Secrets: §f" + String.format(Locale.ROOT, "%,d", d.secrets()),
+				"§7Runs: §f" + String.format(Locale.ROOT, "%,d", d.totalRuns())
+						+ " §7(M7: §f" + d.masterCompletions().getOrDefault(7, 0) + "§7)",
+				"§7Best M7 S+: §f" + (best == null ? "—" : time(best)));
+		int columnEnd = Math.max(barX + barWidth, x + widest(stats));
+
+		double cata = d.catacombsLevel();
+		g.text(font, "§cCatacombs " + decimal(cata), x, y, WHITE, false);
+		drawBar(g, x, y + 10, columnEnd - x, cata >= 50 ? 1 : cata - Math.floor(cata), cata >= 50);
+		y += 18;
+		for (int i = 0; i < classLines.size(); i++) {
+			double level = d.classLevel(DungeonClass.values()[i]);
+			g.text(font, classLines.get(i), x, y, WHITE, false);
+			drawBar(g, barX, y + 2, barWidth, level >= 50 ? 1 : level - Math.floor(level), level >= 50);
 			y += 11;
 		}
 		g.text(font, "§eClass Average " + decimal(d.classAverage()), x, y + 2, WHITE, false);
 		y += 16;
-		Long best = d.masterFastestSPlusMs().get(7);
-		drawLines(g, List.of(
-				"§7Secrets: §f" + String.format(Locale.ROOT, "%,d", d.secrets()),
-				"§7Runs: §f" + String.format(Locale.ROOT, "%,d", d.totalRuns())
-						+ " §7(M7: §f" + d.masterCompletions().getOrDefault(7, 0) + "§7)",
-				"§7Best M7 S+: §f" + (best == null ? "—" : time(best))), x, y);
+		drawLines(g, stats, x, y);
 
-		drawCalculator(g, left + 175, top + 32, mouseX, mouseY);
+		drawCalculator(g, columnEnd + 14, top + 32, mouseX, mouseY);
 	}
 
 	private void drawCalculator(GuiGraphicsExtractor g, int x, int y, int mouseX, int mouseY) {
@@ -284,11 +315,16 @@ public class PvScreen extends Screen {
 		XpBoosts b = dungeonPlan.boosts();
 		List<String> boostLines = new ArrayList<>();
 		boostLines.add("§7Hecatomb " + ROMAN[Math.min(b.hecatombLevel(), 10)] + (b.expertRing() ? " · Expert Ring" : ""));
-		boostLines.add("§7Scarf +" + percent(b.scarfBonus()) + (b.mayorMultiplier() > 1 ? " · Derpy" : ""));
+		boostLines.add("§7Scarf +" + percent(b.scarfBonus()) + " · Graduate " + ROMAN[b.graduateLevel()]);
+		if (b.explorerLevel() > 0 || b.mayorMultiplier() > 1) {
+			boostLines.add("§7" + (b.explorerLevel() > 0 ? "Explorer " + ROMAN[b.explorerLevel()] : "")
+					+ (b.explorerLevel() > 0 && b.mayorMultiplier() > 1 ? " · " : "") + (b.mayorMultiplier() > 1 ? "Derpy" : ""));
+		}
+		boostLines.add("§8Hover for details");
 		drawLines(g, boostLines, x, y);
-		y += boostLines.size() * 10;
+		y += boostLines.size() * 11;
 
-		if (mouseX >= x && mouseX < x + 150 && mouseY >= startY && mouseY < y) {
+		if (mouseX >= x && mouseX < left + PANEL_WIDTH && mouseY >= startY && mouseY < y) {
 			hoveredText = calculatorTooltip(b);
 		}
 	}
@@ -304,11 +340,19 @@ public class PvScreen extends Screen {
 		lines.add(Component.literal("§7Hecatomb: §f" + ROMAN[Math.min(b.hecatombLevel(), 10)] + " §7(+" + percent(b.hecatomb()) + ")"));
 		lines.add(Component.literal("§7Catacombs Expert Ring: §f" + (b.expertRing() ? "yes" : "no")));
 		lines.add(Component.literal("§7Scarf accessory: §f+" + percent(b.scarfBonus()) + " class XP"));
+		lines.add(Component.literal("§7Catacombs Graduate: §f" + ROMAN[b.graduateLevel()] + " §7(+" + percent(b.graduate()) + " class XP)"));
+		lines.add(Component.literal("§7Catacombs Explorer: §f" + ROMAN[b.explorerLevel()] + " §7(+" + percent(b.explorer()) + " Cata XP)"));
 		for (DungeonClass c : DungeonClass.values()) {
 			lines.add(Component.literal("§7" + c.displayName() + " perk: §f+" + percent(b.classPerk(c))));
 		}
 		lines.add(Component.literal("§7Mayor: §f" + (lookup.mayor() == null ? "unknown" : lookup.mayor())
 				+ (b.mayorMultiplier() > 1 ? " (+" + percent(b.mayorMultiplier() - 1) + ")" : "")));
+		if (config.dungeonGraduateLevel >= 0 || config.dungeonExplorerLevel >= 0) {
+			lines.add(Component.literal("§8Shard levels set in your config."));
+		} else {
+			lines.add(Component.literal("§8Shard levels wrong? Set dungeonGraduateLevel"));
+			lines.add(Component.literal("§8and dungeonExplorerLevel in the config."));
+		}
 		if (b.globalMultiplier() > 1 || b.extraClassBonus() > 0) {
 			lines.add(Component.literal("§7From your config: §f+" + percent(b.globalMultiplier() - 1) + " global, +"
 					+ percent(b.extraClassBonus()) + " class"));
@@ -322,14 +366,16 @@ public class PvScreen extends Screen {
 			g.text(font, "§7Inventory API is turned off for this player.", left + 8, y, WHITE, false);
 			return;
 		}
-		g.text(font, "§7Armor", left + 8, y, WHITE, false);
-		drawGrid(g, inv.armor(), left + 8, y + 10, 1, mouseX, mouseY);
-		g.text(font, "§7Equip", left + 32, y, WHITE, false);
-		drawGrid(g, inv.equipment(), left + 32, y + 10, 1, mouseX, mouseY);
+		int armorX = left + 8;
+		g.text(font, "§7Armor", armorX, y, WHITE, false);
+		drawGrid(g, inv.armor(), armorX, y + 10, 1, mouseX, mouseY);
+		int equipX = armorX + Math.max(SLOT, font.width("Armor")) + 10;
+		g.text(font, "§7Equip", equipX, y, WHITE, false);
+		drawGrid(g, inv.equipment(), equipX, y + 10, 1, mouseX, mouseY);
 
 		// The API lists the hotbar first; show it last, under the main inventory, like the game.
 		List<SkyblockItem> items = inv.inventory();
-		int gridX = left + 70;
+		int gridX = equipX + Math.max(SLOT, font.width("Equip")) + 16;
 		g.text(font, "§7Inventory", gridX, y, WHITE, false);
 		if (items.size() > 9) {
 			drawGrid(g, items.subList(9, items.size()), gridX, y + 10, 9, mouseX, mouseY);
@@ -337,24 +383,14 @@ public class PvScreen extends Screen {
 		drawGrid(g, items.subList(0, Math.min(9, items.size())), gridX, y + 10 + 3 * SLOT + 4, 9, mouseX, mouseY);
 	}
 
-	private void drawWardrobe(GuiGraphicsExtractor g, int y, int mouseX, int mouseY) {
-		Wardrobe wardrobe = profile.member().inventories().wardrobe();
-		if (wardrobe == null) {
-			g.text(font, "§7Wardrobe isn't available (inventory API off).", left + 8, y, WHITE, false);
+	private void drawStorage(GuiGraphicsExtractor g, int y, int mouseX, int mouseY) {
+		if (storagePages.isEmpty()) {
+			g.text(font, "§7No ender chest or backpacks visible (inventory API off?).", left + 8, y, WHITE, false);
 			return;
 		}
-		List<WardrobeSlot> slots = wardrobe.slots().subList(page * 9, Math.min(wardrobe.slots().size(), page * 9 + 9));
-		for (int i = 0; i < slots.size(); i++) {
-			WardrobeSlot slot = slots.get(i);
-			int x = left + 8 + i * (SLOT + 4);
-			boolean equipped = slot.number() == wardrobe.equippedSlot();
-			g.text(font, (equipped ? "§a" : "§7") + slot.number(), x + 4, y, WHITE, false);
-			if (equipped) {
-				g.fill(x - 1, y + 9, x + SLOT + 1, y + 10 + 4 * SLOT + 1, 0xFF55FF55);
-				g.text(font, "§a(worn)", x - 2, y + 12 + 4 * SLOT, WHITE, false);
-			}
-			drawGrid(g, Arrays.asList(slot.helmet(), slot.chestplate(), slot.leggings(), slot.boots()), x, y + 10, 1, mouseX, mouseY);
-		}
+		StoragePage current = storagePages.get(Math.min(page, storagePages.size() - 1));
+		g.text(font, "§e" + current.title(), left + 8, y, WHITE, false);
+		drawGrid(g, current.items(), left + 8, y + 11, 9, mouseX, mouseY);
 	}
 
 	private void drawAccessories(GuiGraphicsExtractor g, int y, int mouseX, int mouseY) {
@@ -371,19 +407,26 @@ public class PvScreen extends Screen {
 		TrophyFishing tf = profile.member().trophyFishing();
 		g.text(font, "§6" + tf.rankName() + " §7· " + tf.totalCaught() + " caught · "
 				+ tf.fishAtLeast(TrophyFish.Tier.DIAMOND) + "/" + TrophyFish.values().length + " at diamond", left + 8, y, WHITE, false);
-		y += 12;
+		g.text(font, "§cBronze §7Silver §6Gold §bDiamond", left + 8, y + 11, WHITE, false);
+		y += 24;
 		String[] tierColors = {"§c", "§7", "§6", "§b"};
+		int columnWidth = (PANEL_WIDTH - 16) / 2;
 		int col = 0;
 		int rowY = y;
 		for (TrophyFish fish : TrophyFish.values()) {
-			int x = left + 8 + col * 160;
+			int x = left + 8 + col * columnWidth;
 			TrophyFish.Tier best = tf.bestTier(fish);
-			g.text(font, (best == null ? "§8" : tierColors[best.ordinal()]) + fish.displayName, x, rowY, WHITE, false);
 			StringBuilder counts = new StringBuilder();
 			for (TrophyFish.Tier tier : TrophyFish.Tier.values()) {
-				counts.append(tierColors[tier.ordinal()]).append(tf.count(fish, tier)).append(' ');
+				if (counts.length() > 0) counts.append(' ');
+				counts.append(tierColors[tier.ordinal()]).append(tf.count(fish, tier));
 			}
-			g.text(font, counts.toString(), x + 100, rowY, WHITE, false);
+			// Counts sit flush right in the column; the name gets whatever room is left.
+			int countsWidth = font.width(counts.toString());
+			int countsX = x + columnWidth - 8 - countsWidth;
+			String name = fit(fish.displayName, countsX - x - 4);
+			g.text(font, (best == null ? "§8" : tierColors[best.ordinal()]) + name, x, rowY, WHITE, false);
+			g.text(font, counts.toString(), countsX, rowY, WHITE, false);
 			if (++col == 2) {
 				col = 0;
 				rowY += 11;
@@ -421,11 +464,26 @@ public class PvScreen extends Screen {
 		}
 	}
 
+	/** Width of the widest line, ignoring § colour codes (Font.width already skips them). */
+	private int widest(List<String> lines) {
+		return lines.stream().mapToInt(font::width).max().orElse(0);
+	}
+
+	/** Shortens text with an ellipsis until it fits in {@code maxWidth} pixels. */
+	private String fit(String text, int maxWidth) {
+		if (font.width(text) <= maxWidth) return text;
+		String shortened = text;
+		while (!shortened.isEmpty() && font.width(shortened + "…") > maxWidth) {
+			shortened = shortened.substring(0, shortened.length() - 1);
+		}
+		return shortened + "…";
+	}
+
 	private int pageCount() {
 		if (profile == null) return 1;
 		Inventories inv = profile.member().inventories();
 		return switch (tab) {
-			case WARDROBE -> inv.wardrobe() == null ? 1 : Math.max(1, (inv.wardrobe().slots().size() + 8) / 9);
+			case STORAGE -> Math.max(1, storagePages.size());
 			case ACCESSORIES -> inv.accessoryBag() == null ? 1
 					: Math.max(1, (inv.accessoryBag().size() + ACCESSORIES_PER_PAGE - 1) / ACCESSORIES_PER_PAGE);
 			default -> 1;
