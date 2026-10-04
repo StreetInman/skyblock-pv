@@ -1,0 +1,213 @@
+package io.github.streetinman.skyblockpv.core.parse;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.EnumMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+
+import io.github.streetinman.skyblockpv.core.model.Inventories;
+import io.github.streetinman.skyblockpv.core.model.MemberData;
+import io.github.streetinman.skyblockpv.core.model.Profile;
+import io.github.streetinman.skyblockpv.core.model.SkyblockItem;
+import io.github.streetinman.skyblockpv.core.model.TrophyFish;
+import io.github.streetinman.skyblockpv.core.model.TrophyFishing;
+import io.github.streetinman.skyblockpv.core.model.Wardrobe;
+import io.github.streetinman.skyblockpv.core.model.WardrobeSlot;
+
+/** Parses {@code /v2/skyblock/profiles} responses into {@link Profile}s for one player. */
+public final class ProfileParser {
+	/** The in-game wardrobe shows 9 slots per page, each slot a column of 4 armor pieces. */
+	private static final int WARDROBE_SLOTS_PER_PAGE = 9;
+	private static final int WARDROBE_PAGE_SIZE = WARDROBE_SLOTS_PER_PAGE * 4;
+
+	private static final Set<String> KNOWN_INVENTORY_KEYS = Set.of(
+			"inv_contents", "inv_armor", "equipment_contents", "ender_chest_contents",
+			"wardrobe_contents", "wardrobe_equipped_slot", "bag_contents", "backpack_contents",
+			"backpack_icons", "personal_vault_contents", "sacks_counts");
+
+	private ProfileParser() {
+	}
+
+	/**
+	 * @param response the full JSON body
+	 * @param uuid     undashed UUID of the player being viewed
+	 * @return every profile the player is a member of; empty if they have never played SkyBlock
+	 */
+	public static List<Profile> parseProfiles(JsonObject response, String uuid) throws IOException {
+		if (!response.has("profiles") || response.get("profiles").isJsonNull()) {
+			return List.of();
+		}
+		List<Profile> profiles = new ArrayList<>();
+		for (JsonElement element : response.getAsJsonArray("profiles")) {
+			JsonObject profile = element.getAsJsonObject();
+			JsonObject members = obj(profile, "members");
+			JsonObject member = members == null ? null : obj(members, uuid);
+			if (member == null) continue;
+
+			JsonObject banking = obj(profile, "banking");
+			profiles.add(new Profile(
+					str(profile, "profile_id"),
+					str(profile, "cute_name"),
+					str(profile, "game_mode"),
+					profile.has("selected") && profile.get("selected").getAsBoolean(),
+					banking != null && banking.has("balance") ? banking.get("balance").getAsDouble() : null,
+					parseMember(uuid, member)));
+		}
+		return profiles;
+	}
+
+	/** The profile the player last played on, falling back to the first. */
+	public static Profile selected(List<Profile> profiles) {
+		return profiles.stream().filter(Profile::selected).findFirst()
+				.orElse(profiles.isEmpty() ? null : profiles.getFirst());
+	}
+
+	static MemberData parseMember(String uuid, JsonObject member) throws IOException {
+		Map<String, Double> skillXp = new TreeMap<>();
+		JsonObject experience = path(member, "player_data", "experience");
+		if (experience != null) {
+			for (Map.Entry<String, JsonElement> e : experience.entrySet()) {
+				if (e.getKey().startsWith("SKILL_")) {
+					skillXp.put(e.getKey().substring("SKILL_".length()), e.getValue().getAsDouble());
+				}
+			}
+		}
+
+		return new MemberData(
+				uuid,
+				num(path(member, "leveling"), "experience") / 100.0,
+				num(path(member, "currencies"), "coin_purse"),
+				(int) num(path(member, "fairy_soul"), "total_collected"),
+				Collections.unmodifiableMap(skillXp),
+				parseInventories(obj(member, "inventory")),
+				parseTrophyFish(obj(member, "trophy_fish")));
+	}
+
+	static Inventories parseInventories(JsonObject inv) throws IOException {
+		if (inv == null) {
+			return new Inventories(null, null, null, null, null, null, Map.of(), Set.of());
+		}
+
+		List<SkyblockItem> armor = decodeField(inv, "inv_armor");
+		if (armor != null) {
+			// The API stores armor boots-first; show it helmet-first like the game does.
+			armor = new ArrayList<>(armor);
+			Collections.reverse(armor);
+		}
+
+		Map<Integer, List<SkyblockItem>> backpacks = new TreeMap<>();
+		JsonObject backpackContents = obj(inv, "backpack_contents");
+		if (backpackContents != null) {
+			for (Map.Entry<String, JsonElement> e : backpackContents.entrySet()) {
+				List<SkyblockItem> items = decodeData(e.getValue().getAsJsonObject());
+				if (items != null) backpacks.put(Integer.parseInt(e.getKey()), items);
+			}
+		}
+
+		Set<String> unknown = new LinkedHashSet<>();
+		for (String key : inv.keySet()) {
+			if (!KNOWN_INVENTORY_KEYS.contains(key)) unknown.add(key);
+		}
+
+		JsonObject bags = obj(inv, "bag_contents");
+		return new Inventories(
+				decodeField(inv, "inv_contents"),
+				armor,
+				decodeField(inv, "equipment_contents"),
+				decodeField(inv, "ender_chest_contents"),
+				parseWardrobe(decodeField(inv, "wardrobe_contents"),
+						inv.has("wardrobe_equipped_slot") ? inv.get("wardrobe_equipped_slot").getAsInt() : -1),
+				bags == null ? null : decodeField(bags, "talisman_bag"),
+				Collections.unmodifiableMap(backpacks),
+				Collections.unmodifiableSet(unknown));
+	}
+
+	/**
+	 * Wardrobe items come as pages of 36: rows are helmet, chestplate, leggings, boots and each
+	 * of the 9 columns is one slot.
+	 */
+	static Wardrobe parseWardrobe(List<SkyblockItem> items, int equippedSlot) {
+		if (items == null) return null;
+		List<WardrobeSlot> slots = new ArrayList<>();
+		int pages = (items.size() + WARDROBE_PAGE_SIZE - 1) / WARDROBE_PAGE_SIZE;
+		for (int page = 0; page < pages; page++) {
+			for (int col = 0; col < WARDROBE_SLOTS_PER_PAGE; col++) {
+				int base = page * WARDROBE_PAGE_SIZE + col;
+				slots.add(new WardrobeSlot(
+						page * WARDROBE_SLOTS_PER_PAGE + col + 1,
+						at(items, base),
+						at(items, base + WARDROBE_SLOTS_PER_PAGE),
+						at(items, base + 2 * WARDROBE_SLOTS_PER_PAGE),
+						at(items, base + 3 * WARDROBE_SLOTS_PER_PAGE)));
+			}
+		}
+		return new Wardrobe(List.copyOf(slots), equippedSlot);
+	}
+
+	static TrophyFishing parseTrophyFish(JsonObject trophy) {
+		Map<TrophyFish, Map<TrophyFish.Tier, Integer>> catches = new EnumMap<>(TrophyFish.class);
+		if (trophy == null) {
+			return new TrophyFishing(catches, 0, 0);
+		}
+		for (TrophyFish fish : TrophyFish.values()) {
+			Map<TrophyFish.Tier, Integer> tiers = new EnumMap<>(TrophyFish.Tier.class);
+			for (TrophyFish.Tier tier : TrophyFish.Tier.values()) {
+				String key = fish.apiKey + "_" + tier.apiSuffix();
+				if (trophy.has(key)) tiers.put(tier, trophy.get(key).getAsInt());
+			}
+			if (!tiers.isEmpty()) catches.put(fish, Collections.unmodifiableMap(tiers));
+		}
+		int rank = 0;
+		if (trophy.has("rewards")) {
+			for (JsonElement reward : trophy.getAsJsonArray("rewards")) {
+				rank = Math.max(rank, reward.getAsInt());
+			}
+		}
+		return new TrophyFishing(Collections.unmodifiableMap(catches), (int) num(trophy, "total_caught"), rank);
+	}
+
+	private static List<SkyblockItem> decodeField(JsonObject parent, String key) throws IOException {
+		JsonObject container = obj(parent, key);
+		return container == null ? null : decodeData(container);
+	}
+
+	private static List<SkyblockItem> decodeData(JsonObject container) throws IOException {
+		String data = str(container, "data");
+		return data == null || data.isEmpty() ? null : Collections.unmodifiableList(ItemDecoder.decodeInventory(data));
+	}
+
+	private static SkyblockItem at(List<SkyblockItem> items, int index) {
+		return index < items.size() ? items.get(index) : null;
+	}
+
+	private static JsonObject obj(JsonObject parent, String key) {
+		if (parent == null) return null;
+		JsonElement e = parent.get(key);
+		return e != null && e.isJsonObject() ? e.getAsJsonObject() : null;
+	}
+
+	private static JsonObject path(JsonObject root, String... keys) {
+		JsonObject current = root;
+		for (String key : keys) current = obj(current, key);
+		return current;
+	}
+
+	private static String str(JsonObject parent, String key) {
+		JsonElement e = parent.get(key);
+		return e != null && e.isJsonPrimitive() ? e.getAsString() : null;
+	}
+
+	private static double num(JsonObject parent, String key) {
+		if (parent == null) return 0;
+		JsonElement e = parent.get(key);
+		return e != null && e.isJsonPrimitive() ? e.getAsDouble() : 0;
+	}
+}
