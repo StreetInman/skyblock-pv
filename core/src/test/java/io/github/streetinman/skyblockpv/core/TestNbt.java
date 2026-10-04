@@ -38,6 +38,15 @@ public final class TestNbt {
 		return item;
 	}
 
+	/** An item carrying {@code ExtraAttributes.enchantments}. */
+	@SuppressWarnings("unchecked")
+	public static Map<String, Object> enchanted(int id, String skyblockId, String enchant, int level) {
+		Map<String, Object> item = item(id, skyblockId, skyblockId);
+		Map<String, Object> extra = (Map<String, Object>) ((Map<String, Object>) item.get("tag")).get("ExtraAttributes");
+		extra.put("enchantments", new LinkedHashMap<>(Map.of(enchant, level)));
+		return item;
+	}
+
 	/** An inventory blob: base64(gzip(NBT {i: [slots…]})). Null slots become empty compounds. */
 	public static String inventory(List<Map<String, Object>> slots) {
 		List<Object> list = new ArrayList<>();

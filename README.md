@@ -10,15 +10,38 @@ that player's stats and gear, without leaving the game.
 
 | Tab | Shows |
 |---|---|
-| Overview | SkyBlock level, purse, bank, fairy souls, skill average, trophy fish rank |
+| Stats | SkyBlock level, purse, bank, fairy souls, skill average, Catacombs, class average, trophy fish rank, all slayer levels |
 | Skills | Every skill with level and progress to the next level |
-| Inventory | Armor, equipment (necklace, cloak, belt, gloves), inventory and hotbar |
+| Dungeons | Catacombs and class levels, secrets, runs, best M7 S+, and an **M7 calculator** (below) |
+| Inv | Armor, equipment (necklace, cloak, belt, gloves), inventory and hotbar |
 | Wardrobe | Every wardrobe slot, with the worn set marked |
-| Accessories | Accessory bag |
-| Trophy Fish | All 18 trophy fish with bronze/silver/gold/diamond counts and your Trophy Hunter rank |
+| Accs | Accessory bag |
+| Trophy | All 18 trophy fish with bronze/silver/gold/diamond counts and your Trophy Hunter rank |
 
-Hover any item to see its full name and lore. If a player has more than one profile, use
+Items show with their real icons, including custom player-head textures. Hover any item to see its full name and lore. If a player has more than one profile, use
 **Profile ▸** to switch between them.
+
+### M7 calculator
+
+The Dungeons tab shows how many S+ Master Mode 7 runs the player needs to reach:
+
+- **Catacombs 50**, hidden once reached.
+- **Class average 50**: the total runs, plus how many to play as each class. The plan always
+  plays whichever class is furthest from 50. A class marked *passive only* will reach 50 just from the
+  team XP it gets while you play the others.
+
+It uses the same model as [adjectils.com](https://adjectils.com/dungeon.html): every run is
+S+, and the classes you don't play get a share (25% by default) of their class XP. Boosts are read
+from the profile automatically:
+
+- essence-shop class perks (Toxophilite, Unbridled Rage, Heart of Gold, Cold Efficiency, Diamond in the Rough)
+- the highest Hecatomb level on any visible item
+- Scarf's Studies, Thesis or Grimoire, and the Catacombs Expert Ring in the accessory bag
+- Derpy as the current mayor
+
+Hover the calculator to see exactly which boosts were found. Boosts the API can't see go in
+`config/skyblock-pv.json`: `dungeonGlobalBoostPercent`, `dungeonExtraClassBoostPercent`, and
+`dungeonTeamShare`.
 
 ## Is it allowed on Hypixel?
 
@@ -77,12 +100,19 @@ See [docs/plan.md](docs/plan.md) for the full design.
 ## Roadmap
 
 - [x] `/pv` command, API client, profile parsing, tabs listed above
-- [ ] Real item icons (convert Hypixel's 1.8 item data to modern items)
-- [ ] Storage tab (ender chest, backpacks), pets, dungeons, slayers
+- [x] Real item icons (via [legacy-item-dfu](https://github.com/AzureAaron/legacy-item-dfu))
+- [x] Dungeons tab with M7 calculator, slayers
+- [ ] Storage tab (ender chest, backpacks), pets
 - [ ] Loadouts (pending: confirm the API exposes them, using `/pvdump`)
 - [ ] Player skin render on the overview
 - [ ] API proxy + production key so players don't need their own key
 - [ ] First release on Modrinth
+
+## Credits
+
+- [legacy-item-dfu](https://github.com/AzureAaron/legacy-item-dfu) by AzureAaron (Apache-2.0) converts Hypixel's item data.
+- The dungeon XP model follows [adjectils](https://adjectils.com/dungeon.html), as ported in the
+  MIT-licensed [rtca-bot-hypixel](https://github.com/BLACKUM/rtca-bot-hypixel).
 
 ## License
 

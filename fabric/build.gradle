@@ -7,10 +7,24 @@ base {
 	archivesName = project.archives_base_name
 }
 
+repositories {
+	exclusiveContent {
+		forRepository {
+			maven { url = 'https://maven.azureaaron.net/releases' }
+		}
+		filter {
+			includeGroup 'net.azureaaron'
+		}
+	}
+}
+
 dependencies {
 	minecraft "com.mojang:minecraft:${project.minecraft_version}"
 	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
 	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+
+	// Converts Hypixel's 1.8 item NBT into modern ItemStacks (Apache-2.0, by AzureAaron).
+	include implementation("net.azureaaron:legacy-item-dfu:${project.legacy_item_dfu_version}")
 
 	// The Minecraft-free data layer, bundled into the mod jar.
 	include implementation(project(':core'))

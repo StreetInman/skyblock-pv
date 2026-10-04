@@ -1,33 +1,41 @@
 package io.github.streetinman.skyblockpv.gui;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.item.ItemStack;
 
 import io.github.streetinman.skyblockpv.SkyblockPvClient;
+import io.github.streetinman.skyblockpv.config.PvConfig;
 import io.github.streetinman.skyblockpv.core.api.ProfileService;
+import io.github.streetinman.skyblockpv.core.dungeons.DungeonCalculator;
+import io.github.streetinman.skyblockpv.core.dungeons.DungeonClass;
+import io.github.streetinman.skyblockpv.core.dungeons.DungeonData;
+import io.github.streetinman.skyblockpv.core.dungeons.DungeonLevels;
+import io.github.streetinman.skyblockpv.core.dungeons.XpBoosts;
 import io.github.streetinman.skyblockpv.core.model.Inventories;
 import io.github.streetinman.skyblockpv.core.model.MemberData;
 import io.github.streetinman.skyblockpv.core.model.Profile;
 import io.github.streetinman.skyblockpv.core.model.SkillLevel;
 import io.github.streetinman.skyblockpv.core.model.SkyblockItem;
+import io.github.streetinman.skyblockpv.core.model.Slayer;
 import io.github.streetinman.skyblockpv.core.model.TrophyFish;
 import io.github.streetinman.skyblockpv.core.model.TrophyFishing;
 import io.github.streetinman.skyblockpv.core.model.Wardrobe;
 import io.github.streetinman.skyblockpv.core.model.WardrobeSlot;
+import io.github.streetinman.skyblockpv.item.ItemStacks;
 
 /**
  * The /pv window: a panel with tabs along the top. Data loads asynchronously; until then the
  * panel shows "Loading…" or the error.
- *
- * <p>Items are drawn as rarity-coloured slots with their real name and lore on hover. Turning
- * Hypixel's 1.8 item NBT into real modern item icons is the next milestone.
  */
 public class PvScreen extends Screen {
 	private static final int PANEL_WIDTH = 330;
@@ -36,14 +44,11 @@ public class PvScreen extends Screen {
 	private static final int WHITE = 0xFFFFFFFF;
 	private static final int GREY = 0xFFAAAAAA;
 	private static final int ACCESSORIES_PER_PAGE = 54;
-	/** RGB for §0–§f. */
-	private static final int[] FORMAT_COLORS = {
-			0x000000, 0x0000AA, 0x00AA00, 0x00AAAA, 0xAA0000, 0xAA00AA, 0xFFAA00, 0xAAAAAA,
-			0x555555, 0x5555FF, 0x55FF55, 0x55FFFF, 0xFF5555, 0xFF55FF, 0xFFFF55, 0xFFFFFF};
+	private static final String[] ROMAN = {"0", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"};
 
 	private enum Tab {
-		OVERVIEW("Overview"), SKILLS("Skills"), INVENTORY("Inventory"), WARDROBE("Wardrobe"),
-		ACCESSORIES("Accessories"), TROPHY_FISH("Trophy Fish");
+		OVERVIEW("Stats"), SKILLS("Skills"), DUNGEONS("Dungeons"), INVENTORY("Inv"), WARDROBE("Wardrobe"),
+		ACCESSORIES("Accs"), TROPHY_FISH("Trophy");
 
 		final String label;
 
@@ -52,30 +57,51 @@ public class PvScreen extends Screen {
 		}
 	}
 
+	/** Calculator results, computed once per profile since the class simulation loops per run. */
+	private record DungeonPlan(XpBoosts boosts, int runsToCata50, DungeonCalculator.ClassPlan classPlan) {
+	}
+
 	private final String requestedName;
+	private final PvConfig config;
+	private final ItemStacks.Cache stacks = new ItemStacks.Cache();
 	private ProfileService.Lookup lookup;
 	private Profile profile;
+	private DungeonPlan dungeonPlan;
 	private String error;
 	private Tab tab = Tab.OVERVIEW;
 	private int page;
 
 	private int left;
 	private int top;
-	private List<Component> hoveredTooltip;
+	private ItemStack hoveredStack;
+	private List<Component> hoveredText;
 
-	public PvScreen(String playerName, ProfileService service) {
+	public PvScreen(String playerName, ProfileService service, PvConfig config) {
 		super(Component.literal("Profile Viewer: " + playerName));
 		this.requestedName = playerName;
+		this.config = config;
 		service.lookup(playerName).whenCompleteAsync((result, failure) -> {
 			if (failure != null) {
 				error = SkyblockPvClient.rootMessage(failure);
 				SkyblockPvClient.LOGGER.warn("Lookup for {} failed", playerName, failure);
 			} else {
 				lookup = result;
-				profile = result.selected();
+				selectProfile(result.selected());
 			}
 			rebuildWidgets();
 		}, Minecraft.getInstance());
+	}
+
+	private void selectProfile(Profile p) {
+		profile = p;
+		page = 0;
+		MemberData m = p.member();
+		XpBoosts boosts = XpBoosts.detect(m.dungeons(), m.inventories(), lookup.mayor(),
+				1 + config.dungeonGlobalBoostPercent / 100.0, config.dungeonExtraClassBoostPercent / 100.0, config.dungeonTeamShare);
+		DungeonData d = m.dungeons();
+		dungeonPlan = new DungeonPlan(boosts,
+				DungeonCalculator.runsToCatacombs50(d.catacombsXp(), d.masterCompletions().getOrDefault(7, 0), DungeonCalculator.M7_BASE_XP, boosts),
+				DungeonCalculator.classAverage50(d.classXp(), DungeonCalculator.M7_BASE_XP, boosts));
 	}
 
 	@Override
@@ -97,8 +123,7 @@ public class PvScreen extends Screen {
 		if (lookup != null && lookup.profiles().size() > 1) {
 			addRenderableWidget(Button.builder(Component.literal("Profile ▸"), b -> {
 				int i = lookup.profiles().indexOf(profile);
-				profile = lookup.profiles().get((i + 1) % lookup.profiles().size());
-				page = 0;
+				selectProfile(lookup.profiles().get((i + 1) % lookup.profiles().size()));
 				rebuildWidgets();
 			}).bounds(left + PANEL_WIDTH - 70, top + 4, 66, 16).build());
 		}
@@ -119,7 +144,8 @@ public class PvScreen extends Screen {
 	@Override
 	public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float delta) {
 		super.extractRenderState(g, mouseX, mouseY, delta);
-		hoveredTooltip = null;
+		hoveredStack = null;
+		hoveredText = null;
 
 		g.fill(left, top, left + PANEL_WIDTH, top + PANEL_HEIGHT, 0xE0101018);
 		g.text(font, lookup != null ? lookup.player().name() : requestedName, left + 6, top + 6, WHITE, true);
@@ -135,6 +161,7 @@ public class PvScreen extends Screen {
 			switch (tab) {
 				case OVERVIEW -> drawOverview(g, contentTop);
 				case SKILLS -> drawSkills(g, contentTop);
+				case DUNGEONS -> drawDungeons(g, contentTop, mouseX, mouseY);
 				case INVENTORY -> drawInventory(g, contentTop, mouseX, mouseY);
 				case WARDROBE -> drawWardrobe(g, contentTop, mouseX, mouseY);
 				case ACCESSORIES -> drawAccessories(g, contentTop, mouseX, mouseY);
@@ -145,25 +172,39 @@ public class PvScreen extends Screen {
 			}
 		}
 
-		if (hoveredTooltip != null) {
-			g.setComponentTooltipForNextFrame(font, hoveredTooltip, mouseX, mouseY);
+		if (hoveredStack != null) {
+			g.setTooltipForNextFrame(font, hoveredStack, mouseX, mouseY);
+		} else if (hoveredText != null) {
+			g.setComponentTooltipForNextFrame(font, hoveredText, mouseX, mouseY);
 		}
 	}
 
 	private void drawOverview(GuiGraphicsExtractor g, int y) {
 		MemberData m = profile.member();
-		List<String> lines = new ArrayList<>();
-		lines.add("§bSkyBlock Level: §f" + String.format(Locale.ROOT, "%.2f", m.skyblockLevel()));
-		lines.add("§6Purse: §f" + coins(m.purse()));
-		lines.add("§6Bank: §f" + (profile.bankBalance() == null ? "§7API off / none" : coins(profile.bankBalance())));
-		lines.add("§dFairy Souls: §f" + m.fairySouls());
+		DungeonData d = m.dungeons();
 		double average = skills().stream().mapToInt(SkillLevel::level).average().orElse(0);
-		lines.add("§eSkill Average: §f" + (skills().isEmpty() ? "§7API off" : String.format(Locale.ROOT, "%.2f", average)));
-		lines.add("§3Trophy Fish: §f" + m.trophyFishing().totalCaught() + " §7(" + m.trophyFishing().rankName() + ")");
-		for (String line : lines) {
-			g.text(font, line, left + 8, y, WHITE, false);
-			y += 12;
+		List<String> stats = List.of(
+				"§bSkyBlock Level: §f" + decimal(m.skyblockLevel()),
+				"§6Purse: §f" + coins(m.purse()),
+				"§6Bank: §f" + (profile.bankBalance() == null ? "§7API off / none" : coins(profile.bankBalance())),
+				"§dFairy Souls: §f" + m.fairySouls(),
+				"§eSkill Average: §f" + (skills().isEmpty() ? "§7API off" : decimal(average)),
+				"§cCatacombs: §f" + decimal(d.catacombsLevel()),
+				"§cClass Average: §f" + decimal(d.classAverage()),
+				"§3Trophy Fish: §f" + m.trophyFishing().totalCaught() + " §7(" + m.trophyFishing().rankName() + ")");
+		drawLines(g, stats, left + 8, y);
+
+		List<String> slayers = new ArrayList<>();
+		slayers.add("§5Slayers");
+		long totalSlayerXp = 0;
+		for (Slayer s : Slayer.values()) {
+			long xp = m.slayerXp().getOrDefault(s, 0L);
+			totalSlayerXp += xp;
+			int level = s.level(xp);
+			slayers.add((level == s.maxLevel() ? "§6" : "§f") + s.displayName + " " + level + " §7" + compact(xp) + " XP");
 		}
+		slayers.add("§7Total: " + compact(totalSlayerXp) + " XP");
+		drawLines(g, slayers, left + 175, y);
 	}
 
 	private void drawSkills(GuiGraphicsExtractor g, int y) {
@@ -177,14 +218,102 @@ public class PvScreen extends Screen {
 			int x = left + 8 + col * 160;
 			String name = skill.skill().charAt(0) + skill.skill().substring(1).toLowerCase(Locale.ROOT);
 			g.text(font, (skill.maxed() ? "§6" : "§f") + name + " " + skill.level(), x, y, WHITE, false);
-			int barY = y + 10;
-			g.fill(x, barY, x + 140, barY + 4, 0xFF333333);
-			g.fill(x, barY, x + (int) (140 * skill.progress()), barY + 4, skill.maxed() ? 0xFFFFAA00 : 0xFF55FF55);
+			drawBar(g, x, y + 10, 140, skill.progress(), skill.maxed());
 			if (++col == 2) {
 				col = 0;
 				y += 22;
 			}
 		}
+	}
+
+	private void drawDungeons(GuiGraphicsExtractor g, int y, int mouseX, int mouseY) {
+		DungeonData d = profile.member().dungeons();
+		int x = left + 8;
+
+		double cata = d.catacombsLevel();
+		g.text(font, "§cCatacombs " + decimal(cata), x, y, WHITE, false);
+		drawBar(g, x, y + 10, 150, cata >= 50 ? 1 : cata - Math.floor(cata), cata >= 50);
+		y += 18;
+		for (DungeonClass c : DungeonClass.values()) {
+			double level = d.classLevel(c);
+			String marker = c == d.selectedClass() ? " §a◆" : "";
+			g.text(font, (level >= 50 ? "§6" : "§f") + c.displayName() + " " + decimal(level) + marker, x, y, WHITE, false);
+			drawBar(g, x + 90, y + 2, 60, level >= 50 ? 1 : level - Math.floor(level), level >= 50);
+			y += 11;
+		}
+		g.text(font, "§eClass Average " + decimal(d.classAverage()), x, y + 2, WHITE, false);
+		y += 16;
+		Long best = d.masterFastestSPlusMs().get(7);
+		drawLines(g, List.of(
+				"§7Secrets: §f" + String.format(Locale.ROOT, "%,d", d.secrets()),
+				"§7Runs: §f" + String.format(Locale.ROOT, "%,d", d.totalRuns())
+						+ " §7(M7: §f" + d.masterCompletions().getOrDefault(7, 0) + "§7)",
+				"§7Best M7 S+: §f" + (best == null ? "—" : time(best))), x, y);
+
+		drawCalculator(g, left + 175, top + 32, mouseX, mouseY);
+	}
+
+	private void drawCalculator(GuiGraphicsExtractor g, int x, int y, int mouseX, int mouseY) {
+		int startY = y;
+		g.text(font, "§6§lM7 Calculator", x, y, WHITE, false);
+		y += 13;
+
+		if (dungeonPlan.runsToCata50() > 0) {
+			g.text(font, "§fCata 50: §e" + String.format(Locale.ROOT, "%,d", dungeonPlan.runsToCata50()) + " runs", x, y, WHITE, false);
+			y += 13;
+		}
+
+		DungeonCalculator.ClassPlan plan = dungeonPlan.classPlan();
+		if (plan.totalRuns() > 0) {
+			g.text(font, "§fClass Avg 50: §e" + String.format(Locale.ROOT, "%,d", plan.totalRuns()) + " runs", x, y, WHITE, false);
+			y += 11;
+			for (DungeonClass c : DungeonClass.values()) {
+				int runs = plan.runsAs().get(c);
+				String line = runs == 0 ? "§7" + c.displayName() + ": §apassive only" : "§7" + c.displayName() + ": §f" + String.format(Locale.ROOT, "%,d", runs);
+				g.text(font, line, x + 6, y, WHITE, false);
+				y += 10;
+			}
+			y += 3;
+		}
+
+		if (dungeonPlan.runsToCata50() == 0 && plan.totalRuns() == 0) {
+			g.text(font, "§aCata 50 and class average 50 done!", x, y, WHITE, false);
+			y += 13;
+		}
+
+		XpBoosts b = dungeonPlan.boosts();
+		List<String> boostLines = new ArrayList<>();
+		boostLines.add("§7Hecatomb " + ROMAN[Math.min(b.hecatombLevel(), 10)] + (b.expertRing() ? " · Expert Ring" : ""));
+		boostLines.add("§7Scarf +" + percent(b.scarfBonus()) + (b.mayorMultiplier() > 1 ? " · Derpy" : ""));
+		drawLines(g, boostLines, x, y);
+		y += boostLines.size() * 10;
+
+		if (mouseX >= x && mouseX < x + 150 && mouseY >= startY && mouseY < y) {
+			hoveredText = calculatorTooltip(b);
+		}
+	}
+
+	private List<Component> calculatorTooltip(XpBoosts b) {
+		List<Component> lines = new ArrayList<>();
+		lines.add(Component.literal("§6How this is calculated"));
+		lines.add(Component.literal("§7S+ M7 runs (300k base XP), always playing"));
+		lines.add(Component.literal("§7the class furthest from 50. Classes you"));
+		lines.add(Component.literal("§7don't play get " + percent(b.teamShare()) + " of their XP."));
+		lines.add(Component.literal(""));
+		lines.add(Component.literal("§eBoosts found on this profile:"));
+		lines.add(Component.literal("§7Hecatomb: §f" + ROMAN[Math.min(b.hecatombLevel(), 10)] + " §7(+" + percent(b.hecatomb()) + ")"));
+		lines.add(Component.literal("§7Catacombs Expert Ring: §f" + (b.expertRing() ? "yes" : "no")));
+		lines.add(Component.literal("§7Scarf accessory: §f+" + percent(b.scarfBonus()) + " class XP"));
+		for (DungeonClass c : DungeonClass.values()) {
+			lines.add(Component.literal("§7" + c.displayName() + " perk: §f+" + percent(b.classPerk(c))));
+		}
+		lines.add(Component.literal("§7Mayor: §f" + (lookup.mayor() == null ? "unknown" : lookup.mayor())
+				+ (b.mayorMultiplier() > 1 ? " (+" + percent(b.mayorMultiplier() - 1) + ")" : "")));
+		if (b.globalMultiplier() > 1 || b.extraClassBonus() > 0) {
+			lines.add(Component.literal("§7From your config: §f+" + percent(b.globalMultiplier() - 1) + " global, +"
+					+ percent(b.extraClassBonus()) + " class"));
+		}
+		return lines;
 	}
 
 	private void drawInventory(GuiGraphicsExtractor g, int y, int mouseX, int mouseY) {
@@ -224,7 +353,7 @@ public class PvScreen extends Screen {
 				g.fill(x - 1, y + 9, x + SLOT + 1, y + 10 + 4 * SLOT + 1, 0xFF55FF55);
 				g.text(font, "§a(worn)", x - 2, y + 12 + 4 * SLOT, WHITE, false);
 			}
-			drawGrid(g, java.util.Arrays.asList(slot.helmet(), slot.chestplate(), slot.leggings(), slot.boots()), x, y + 10, 1, mouseX, mouseY);
+			drawGrid(g, Arrays.asList(slot.helmet(), slot.chestplate(), slot.leggings(), slot.boots()), x, y + 10, 1, mouseX, mouseY);
 		}
 	}
 
@@ -270,11 +399,25 @@ public class PvScreen extends Screen {
 			g.fill(sx, sy, sx + SLOT - 1, sy + SLOT - 1, 0xFF373737);
 			SkyblockItem item = items.get(i);
 			if (item == null) continue;
-			g.fill(sx + 2, sy + 2, sx + SLOT - 3, sy + SLOT - 3, rarityColor(item));
+			ItemStack stack = stacks.get(item);
+			g.item(stack, sx + 1, sy + 1);
+			g.itemDecorations(font, stack, sx + 1, sy + 1);
 			if (mouseX >= sx && mouseX < sx + SLOT && mouseY >= sy && mouseY < sy + SLOT) {
 				g.fill(sx, sy, sx + SLOT - 1, sy + SLOT - 1, 0x80FFFFFF);
-				hoveredTooltip = tooltip(item);
+				hoveredStack = stack;
 			}
+		}
+	}
+
+	private void drawBar(GuiGraphicsExtractor g, int x, int y, int width, double progress, boolean maxed) {
+		g.fill(x, y, x + width, y + 4, 0xFF333333);
+		g.fill(x, y, x + (int) (width * Math.max(0, Math.min(1, progress))), y + 4, maxed ? 0xFFFFAA00 : 0xFF55FF55);
+	}
+
+	private void drawLines(GuiGraphicsExtractor g, List<String> lines, int x, int y) {
+		for (String line : lines) {
+			g.text(font, line, x, y, WHITE, false);
+			y += 11;
 		}
 	}
 
@@ -291,34 +434,33 @@ public class PvScreen extends Screen {
 
 	private List<SkillLevel> skills() {
 		List<SkillLevel> levels = new ArrayList<>();
-		profile.member().skillXp().forEach((skill, xp) -> {
-			if (lookup.skills().knows(skill)) levels.add(lookup.skills().level(skill, xp));
-		});
-		return levels;
-	}
-
-	private static List<Component> tooltip(SkyblockItem item) {
-		List<Component> lines = new ArrayList<>();
-		lines.add(Component.literal(item.name() != null ? item.name() : String.valueOf(item.skyblockId())));
-		for (String line : item.lore()) lines.add(Component.literal(line));
-		return lines;
-	}
-
-	/** Colour of the rarity line (last lore line), e.g. §6 for legendary. */
-	private static int rarityColor(SkyblockItem item) {
-		if (!item.lore().isEmpty()) {
-			String last = item.lore().getLast();
-			int idx = last.indexOf('§');
-			if (idx >= 0 && idx + 1 < last.length()) {
-				int code = "0123456789abcdef".indexOf(Character.toLowerCase(last.charAt(idx + 1)));
-				if (code >= 0) return 0xFF000000 | FORMAT_COLORS[code];
-			}
+		for (Map.Entry<String, Double> e : profile.member().skillXp().entrySet()) {
+			if (lookup.skills().knows(e.getKey())) levels.add(lookup.skills().level(e.getKey(), e.getValue()));
 		}
-		return 0xFFAAAAAA;
+		return levels;
 	}
 
 	private static String coins(double amount) {
 		return String.format(Locale.ROOT, "%,.0f", amount);
+	}
+
+	private static String decimal(double value) {
+		return String.format(Locale.ROOT, "%.2f", value);
+	}
+
+	private static String percent(double fraction) {
+		return String.format(Locale.ROOT, "%.4g", fraction * 100).replaceAll("\\.?0+$", "") + "%";
+	}
+
+	private static String compact(long value) {
+		if (value >= 1_000_000) return String.format(Locale.ROOT, "%.1fM", value / 1_000_000.0);
+		if (value >= 1_000) return String.format(Locale.ROOT, "%.1fk", value / 1_000.0);
+		return Long.toString(value);
+	}
+
+	private static String time(long millis) {
+		long seconds = millis / 1000;
+		return String.format(Locale.ROOT, "%d:%02d", seconds / 60, seconds % 60);
 	}
 
 	@Override

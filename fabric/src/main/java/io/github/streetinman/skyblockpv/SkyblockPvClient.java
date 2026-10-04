@@ -59,7 +59,7 @@ public final class SkyblockPvClient implements ClientModInitializer {
 	private static int open(String player) {
 		Minecraft mc = Minecraft.getInstance();
 		// Open next tick: the chat screen closes after the command runs and would replace ours.
-		mc.schedule(() -> mc.gui.setScreen(new PvScreen(player, profiles)));
+		mc.schedule(() -> mc.gui.setScreen(new PvScreen(player, profiles, config)));
 		return 1;
 	}
 

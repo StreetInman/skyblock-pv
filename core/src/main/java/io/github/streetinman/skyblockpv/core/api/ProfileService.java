@@ -13,7 +13,8 @@ import io.github.streetinman.skyblockpv.core.parse.SkillTable;
 
 /** Everything /pv needs for one player, fetched and parsed off the render thread. */
 public final class ProfileService {
-	public record Lookup(MojangClient.PlayerId player, List<Profile> profiles, Profile selected, SkillTable skills, JsonObject raw) {
+	/** @param mayor current SkyBlock mayor's name, or null if the election data couldn't be loaded */
+	public record Lookup(MojangClient.PlayerId player, List<Profile> profiles, Profile selected, SkillTable skills, String mayor, JsonObject raw) {
 	}
 
 	private final MojangClient mojang;
@@ -25,8 +26,14 @@ public final class ProfileService {
 	}
 
 	public CompletableFuture<Lookup> lookup(String username) {
+		CompletableFuture<SkillTable> skills = hypixel.resource("skills").thenApply(SkillTable::fromResource);
+		// The mayor only tunes the dungeon calculator, so a failure here must not fail /pv.
+		CompletableFuture<String> mayor = hypixel.resource("election")
+				.thenApply(e -> e.getAsJsonObject("mayor").get("name").getAsString())
+				.exceptionally(e -> null);
+
 		return mojang.lookup(username).thenCompose(player -> hypixel.skyblockProfiles(player.uuid())
-				.thenCombine(hypixel.resource("skills"), (raw, skills) -> {
+				.thenCombine(skills, (raw, skillTable) -> {
 					List<Profile> profiles;
 					try {
 						profiles = ProfileParser.parseProfiles(raw, player.uuid());
@@ -36,8 +43,9 @@ public final class ProfileService {
 					if (profiles.isEmpty()) {
 						throw new ApiException(ApiException.Kind.NO_SKYBLOCK, player.name() + " has never played SkyBlock");
 					}
-					return new Lookup(player, profiles, ProfileParser.selected(profiles), SkillTable.fromResource(skills), raw);
-				}));
+					return new Lookup(player, profiles, ProfileParser.selected(profiles), skillTable, null, raw);
+				})
+				.thenCombine(mayor, (l, mayorName) -> new Lookup(l.player(), l.profiles(), l.selected(), l.skills(), mayorName, l.raw())));
 	}
 
 	public HypixelClient hypixel() {

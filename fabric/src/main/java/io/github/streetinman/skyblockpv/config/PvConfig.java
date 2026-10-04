@@ -22,11 +22,24 @@ public final class PvConfig {
 	public String apiKey = "";
 	public String apiBaseUrl = HypixelClient.HYPIXEL_BASE_URL;
 
+	// Dungeon calculator. Everything else (perks, Hecatomb, Scarf, Expert Ring, Derpy) is read
+	// from the profile automatically; these cover what the API can't see.
+	/** An active global dungeon XP boost, e.g. 20 for +20%. */
+	public double dungeonGlobalBoostPercent = 0;
+	/** Any other class XP bonus you have that the API doesn't expose. */
+	public double dungeonExtraClassBoostPercent = 0;
+	/** Share of a run's class XP that the classes you didn't play receive. */
+	public double dungeonTeamShare = io.github.streetinman.skyblockpv.core.dungeons.XpBoosts.DEFAULT_TEAM_SHARE;
+
 	public static PvConfig load(Path file) {
 		try {
 			if (Files.exists(file)) {
 				PvConfig config = GSON.fromJson(Files.readString(file), PvConfig.class);
-				if (config != null) return config;
+				if (config != null) {
+					// Re-save so settings added in newer versions show up in the file.
+					config.save(file);
+					return config;
+				}
 			}
 		} catch (IOException | RuntimeException e) {
 			io.github.streetinman.skyblockpv.SkyblockPvClient.LOGGER.warn("Couldn't read {}, using defaults", file, e);

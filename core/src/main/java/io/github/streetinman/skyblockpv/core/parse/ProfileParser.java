@@ -13,10 +13,13 @@ import java.util.TreeMap;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
+import io.github.streetinman.skyblockpv.core.dungeons.DungeonClass;
+import io.github.streetinman.skyblockpv.core.dungeons.DungeonData;
 import io.github.streetinman.skyblockpv.core.model.Inventories;
 import io.github.streetinman.skyblockpv.core.model.MemberData;
 import io.github.streetinman.skyblockpv.core.model.Profile;
 import io.github.streetinman.skyblockpv.core.model.SkyblockItem;
+import io.github.streetinman.skyblockpv.core.model.Slayer;
 import io.github.streetinman.skyblockpv.core.model.TrophyFish;
 import io.github.streetinman.skyblockpv.core.model.TrophyFishing;
 import io.github.streetinman.skyblockpv.core.model.Wardrobe;
@@ -88,7 +91,75 @@ public final class ProfileParser {
 				(int) num(path(member, "fairy_soul"), "total_collected"),
 				Collections.unmodifiableMap(skillXp),
 				parseInventories(obj(member, "inventory")),
-				parseTrophyFish(obj(member, "trophy_fish")));
+				parseTrophyFish(obj(member, "trophy_fish")),
+				parseDungeons(member),
+				parseSlayers(path(member, "slayer", "slayer_bosses")));
+	}
+
+	static DungeonData parseDungeons(JsonObject member) {
+		JsonObject dungeons = obj(member, "dungeons");
+		JsonObject cata = path(dungeons, "dungeon_types", "catacombs");
+		JsonObject master = path(dungeons, "dungeon_types", "master_catacombs");
+
+		Map<DungeonClass, Double> classXp = new EnumMap<>(DungeonClass.class);
+		JsonObject classes = obj(dungeons, "player_classes");
+		for (DungeonClass c : DungeonClass.values()) {
+			classXp.put(c, num(obj(classes, c.apiKey), "experience"));
+		}
+
+		DungeonClass selected = null;
+		String selectedKey = dungeons == null ? null : str(dungeons, "selected_dungeon_class");
+		for (DungeonClass c : DungeonClass.values()) {
+			if (c.apiKey.equals(selectedKey)) selected = c;
+		}
+
+		Map<Integer, Long> fastest = new TreeMap<>();
+		JsonObject fastestTimes = obj(master, "fastest_time_s_plus");
+		if (fastestTimes != null) {
+			for (Map.Entry<String, JsonElement> e : fastestTimes.entrySet()) {
+				if (isFloor(e.getKey())) fastest.put(Integer.parseInt(e.getKey()), e.getValue().getAsLong());
+			}
+		}
+
+		Map<String, Integer> perks = new TreeMap<>();
+		JsonObject perksJson = path(member, "player_data", "perks");
+		if (perksJson != null) {
+			for (Map.Entry<String, JsonElement> e : perksJson.entrySet()) {
+				if (e.getValue().isJsonPrimitive()) perks.put(e.getKey(), e.getValue().getAsInt());
+			}
+		}
+
+		return new DungeonData(
+				num(cata, "experience"),
+				Collections.unmodifiableMap(classXp),
+				selected,
+				(long) num(dungeons, "secrets"),
+				completions(obj(cata, "tier_completions")),
+				completions(obj(master, "tier_completions")),
+				Collections.unmodifiableMap(fastest),
+				Collections.unmodifiableMap(perks));
+	}
+
+	private static Map<Integer, Integer> completions(JsonObject tiers) {
+		Map<Integer, Integer> result = new TreeMap<>();
+		if (tiers != null) {
+			for (Map.Entry<String, JsonElement> e : tiers.entrySet()) {
+				if (isFloor(e.getKey())) result.put(Integer.parseInt(e.getKey()), e.getValue().getAsInt());
+			}
+		}
+		return Collections.unmodifiableMap(result);
+	}
+
+	private static boolean isFloor(String key) {
+		return key.matches("\\d+");
+	}
+
+	static Map<Slayer, Long> parseSlayers(JsonObject bosses) {
+		Map<Slayer, Long> xp = new EnumMap<>(Slayer.class);
+		for (Slayer s : Slayer.values()) {
+			xp.put(s, (long) num(obj(bosses, s.apiKey), "xp"));
+		}
+		return Collections.unmodifiableMap(xp);
 	}
 
 	static Inventories parseInventories(JsonObject inv) throws IOException {

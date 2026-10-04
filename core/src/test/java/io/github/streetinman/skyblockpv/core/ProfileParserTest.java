@@ -87,6 +87,27 @@ class ProfileParserTest {
 	}
 
 	@Test
+	void parsesDungeonsAndSlayers() throws Exception {
+		MemberData m = ProfileParser.parseProfiles(response(member(true), false), UUID).get(1).member();
+		var d = m.dungeons();
+
+		assertEquals(1.0e8, d.catacombsXp());
+		assertEquals(2.0e8, d.classXp().get(io.github.streetinman.skyblockpv.core.dungeons.DungeonClass.MAGE));
+		assertEquals(0.0, d.classXp().get(io.github.streetinman.skyblockpv.core.dungeons.DungeonClass.HEALER));
+		assertEquals(io.github.streetinman.skyblockpv.core.dungeons.DungeonClass.MAGE, d.selectedClass());
+		assertEquals(12345, d.secrets());
+		assertEquals(Map.of(0, 3, 7, 40), d.floorCompletions());
+		assertEquals(120, d.masterCompletions().get(7));
+		assertEquals(312000L, d.masterFastestSPlusMs().get(7));
+		assertEquals(163, d.totalRuns());
+		assertEquals(5, d.perks().get("cold_efficiency"));
+
+		assertEquals(9, io.github.streetinman.skyblockpv.core.model.Slayer.ZOMBIE.level(m.slayerXp().get(io.github.streetinman.skyblockpv.core.model.Slayer.ZOMBIE)));
+		assertEquals(4, io.github.streetinman.skyblockpv.core.model.Slayer.WOLF.level(m.slayerXp().get(io.github.streetinman.skyblockpv.core.model.Slayer.WOLF)));
+		assertEquals(0L, m.slayerXp().get(io.github.streetinman.skyblockpv.core.model.Slayer.BLAZE));
+	}
+
+	@Test
 	void handlesInventoryApiDisabled() throws Exception {
 		Inventories inv = ProfileParser.parseProfiles(response(member(false), false), UUID).get(1).member().inventories();
 		assertFalse(inv.apiEnabled());
@@ -146,6 +167,21 @@ class ProfileParserTest {
 		rewards.add(2);
 		trophy.add("rewards", rewards);
 		m.add("trophy_fish", trophy);
+
+		m.add("dungeons", com.google.gson.JsonParser.parseString("""
+				{"selected_dungeon_class": "mage", "secrets": 12345,
+				 "dungeon_types": {
+				   "catacombs": {"experience": 1.0e8, "tier_completions": {"0": 3, "7": 40, "total": 43}},
+				   "master_catacombs": {"experience": 0, "tier_completions": {"7": 120},
+				     "fastest_time_s_plus": {"7": 312000, "best": 312000}}},
+				 "player_classes": {"mage": {"experience": 2.0e8}, "tank": {"experience": 5.0e7}}}
+				""").getAsJsonObject());
+		JsonObject perks = new JsonObject();
+		perks.addProperty("cold_efficiency", 5);
+		m.getAsJsonObject("player_data").add("perks", perks);
+		JsonObject slayer = com.google.gson.JsonParser.parseString(
+				"{\"slayer_bosses\": {\"zombie\": {\"xp\": 1500000}, \"wolf\": {\"xp\": 2000}}}").getAsJsonObject();
+		m.add("slayer", slayer);
 
 		if (inventoryApi) {
 			JsonObject inv = new JsonObject();
