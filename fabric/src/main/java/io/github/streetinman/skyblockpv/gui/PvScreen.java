@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
@@ -37,6 +36,10 @@ public class PvScreen extends Screen {
 	private static final int WHITE = 0xFFFFFFFF;
 	private static final int GREY = 0xFFAAAAAA;
 	private static final int ACCESSORIES_PER_PAGE = 54;
+	/** RGB for §0–§f. */
+	private static final int[] FORMAT_COLORS = {
+			0x000000, 0x0000AA, 0x00AA00, 0x00AAAA, 0xAA0000, 0xAA00AA, 0xFFAA00, 0xAAAAAA,
+			0x555555, 0x5555FF, 0x55FF55, 0x55FFFF, 0xFF5555, 0xFF55FF, 0xFFFF55, 0xFFFFFF};
 
 	private enum Tab {
 		OVERVIEW("Overview"), SKILLS("Skills"), INVENTORY("Inventory"), WARDROBE("Wardrobe"),
@@ -307,8 +310,8 @@ public class PvScreen extends Screen {
 			String last = item.lore().getLast();
 			int idx = last.indexOf('§');
 			if (idx >= 0 && idx + 1 < last.length()) {
-				ChatFormatting format = ChatFormatting.getByCode(last.charAt(idx + 1));
-				if (format != null && format.getColor() != null) return 0xFF000000 | format.getColor();
+				int code = "0123456789abcdef".indexOf(Character.toLowerCase(last.charAt(idx + 1)));
+				if (code >= 0) return 0xFF000000 | FORMAT_COLORS[code];
 			}
 		}
 		return 0xFFAAAAAA;
