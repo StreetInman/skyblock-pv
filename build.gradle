@@ -1,3 +1,16 @@
+// One source tree, built once per Minecraft version: ./gradlew build -Pmc=26.1.2
+def mc = providers.gradleProperty('mc').getOrElse(project.default_mc)
+def versionFile = file("versions/${mc}.properties")
+if (!versionFile.exists()) {
+	throw new GradleException("No versions/${mc}.properties. Supported: " + file('versions').list().collect { it - '.properties' }.sort())
+}
+def versionProps = new Properties()
+versionFile.withInputStream { versionProps.load(it) }
+
+allprojects {
+	versionProps.each { key, value -> ext.set(key, value) }
+}
+
 subprojects {
 	group = project.maven_group
 	version = "${project.mod_version}+${project.minecraft_version}"

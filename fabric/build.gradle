@@ -32,8 +32,9 @@ dependencies {
 
 processResources {
 	inputs.property 'version', project.version
+	inputs.property 'minecraft_range', project.minecraft_range
 	filesMatching('fabric.mod.json') {
-		expand 'version': project.version
+		expand 'version': project.version, 'minecraft_range': project.minecraft_range
 	}
 }
 
@@ -55,6 +56,7 @@ jar {
 publishMods {
 	file = jar.archiveFile
 	changelog = providers.environmentVariable('CHANGELOG').orElse('See GitHub releases.')
+	displayName = "${project.mod_version} for Minecraft ${project.minecraft_version}"
 	type = STABLE
 	modLoaders.add('fabric')
 	dryRun = providers.environmentVariable('MODRINTH_TOKEN').getOrNull() == null

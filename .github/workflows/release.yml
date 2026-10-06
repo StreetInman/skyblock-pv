@@ -1,6 +1,7 @@
 name: Release
 
-# Push a tag like v0.1.0 to build the jar, attach it to a GitHub release, and upload it to Modrinth.
+# Push a tag like v0.2.0 to build a jar for every supported Minecraft version, attach them all to
+# one GitHub release, and upload each to Modrinth (only if the MODRINTH_TOKEN secret is set).
 on:
   push:
     tags: ['v*']
@@ -9,8 +10,11 @@ permissions:
   contents: write
 
 jobs:
-  release:
+  build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        mc: ['26.1.2', '26.2', '26.3']
     env:
       MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
     steps:
@@ -20,11 +24,24 @@ jobs:
           distribution: temurin
           java-version: 25
       - uses: gradle/actions/setup-gradle@v4
-      - run: ./gradlew build
-      - uses: softprops/action-gh-release@v2
+      - run: ./gradlew build -Pmc=${{ matrix.mc }}
+      - uses: actions/upload-artifact@v4
         with:
-          files: fabric/build/libs/skyblock-pv-*[0-9].jar
-          generate_release_notes: true
+          name: jar-${{ matrix.mc }}
+          path: fabric/build/libs/skyblock-pv-*[0-9].jar
       - name: Publish to Modrinth
         if: ${{ env.MODRINTH_TOKEN != '' }}
-        run: ./gradlew :fabric:publishMods
+        run: ./gradlew :fabric:publishMods -Pmc=${{ matrix.mc }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: jar-*
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: '*.jar'
+          generate_release_notes: true
