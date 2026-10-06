@@ -2,7 +2,8 @@
 
 ## GitHub releases
 
-Releases are built by `.github/workflows/release.yml`. Pushing a tag such as `v0.2.0` builds one jar
+Releases are built by `.github/workflows/release.yml`. Pushing a tag such as `v0.2.0` (or pushing
+to the `release` branch, which tags the release `v<mod_version>`) builds one jar
 per Minecraft version in `versions/`, attaches them all to a GitHub release, and (once set up below)
 uploads them to Modrinth.
 

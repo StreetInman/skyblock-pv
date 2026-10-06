@@ -1,10 +1,12 @@
 name: Release
 
-# Push a tag like v0.2.0 to build a jar for every supported Minecraft version, attach them all to
-# one GitHub release, and upload each to Modrinth (only if the MODRINTH_TOKEN secret is set).
+# Push a tag like v0.2.0, or push to the `release` branch, to build a jar for every supported
+# Minecraft version, attach them all to one GitHub release (tagged v<mod_version>), and upload
+# each to Modrinth (only if the MODRINTH_TOKEN secret is set).
 on:
   push:
     tags: ['v*']
+    branches: [release]
 
 permissions:
   contents: write
@@ -37,11 +39,22 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+      - name: Work out the tag
+        id: tag
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            echo "name=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=v$(grep '^mod_version=' gradle.properties | cut -d= -f2)" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/download-artifact@v4
         with:
           pattern: jar-*
           merge-multiple: true
       - uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.tag.outputs.name }}
+          target_commitish: ${{ github.sha }}
           files: '*.jar'
           generate_release_notes: true
