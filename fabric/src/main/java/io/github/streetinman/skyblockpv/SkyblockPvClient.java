@@ -26,13 +26,15 @@ import io.github.streetinman.skyblockpv.core.api.ProfileService;
 import io.github.streetinman.skyblockpv.gui.PvScreen;
 
 /**
- * Registers {@code /pv [player]} and {@code /pvdump <player>}.
+ * Registers {@code /pv [player]} (also {@code /spv} and {@code /sbpv}) and {@code /pvdump <player>}.
  *
  * <p>Everything here is read-only: the mod calls the public Hypixel API over HTTPS and draws its
  * own screen. It never sends packets to the server or acts on the player's behalf.
  */
 public final class SkyblockPvClient implements ClientModInitializer {
 	public static final Logger LOGGER = LoggerFactory.getLogger("skyblock-pv");
+
+	private static final String[] COMMAND_NAMES = {"pv", "spv", "sbpv"};
 
 	private static PvConfig config;
 	private static ProfileService profiles;
@@ -46,17 +48,20 @@ public final class SkyblockPvClient implements ClientModInitializer {
 		profiles = new ProfileService(new MojangClient(http), new HypixelClient(http, () -> config.apiBaseUrl, () -> config.apiKey));
 
 		ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
-			dispatcher.register(ClientCommands.literal("pv")
-					.executes(ctx -> open(Minecraft.getInstance().getUser().getName()))
-					.then(ClientCommands.argument("player", StringArgumentType.word())
-							.executes(ctx -> open(StringArgumentType.getString(ctx, "player")))));
+			// Other SkyBlock mods often claim /pv too, so the same command is also on /spv and /sbpv.
+			for (String name : COMMAND_NAMES) {
+				dispatcher.register(ClientCommands.literal(name)
+						.executes(ctx -> open(Minecraft.getInstance().getUser().getName()))
+						.then(ClientCommands.argument("player", StringArgumentType.word())
+								.executes(ctx -> open(StringArgumentType.getString(ctx, "player")))));
+			}
 			dispatcher.register(ClientCommands.literal("pvdump")
 					.then(ClientCommands.argument("player", StringArgumentType.word())
 							.executes(SkyblockPvClient::dump)));
 		});
 	}
 
-	private static int open(String player) {
+	public static int open(String player) {
 		Minecraft mc = Minecraft.getInstance();
 		// Open next tick: the chat screen closes after the command runs and would replace ours.
 		mc.schedule(() -> mc.gui.setScreen(new PvScreen(player, profiles, config)));

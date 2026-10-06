@@ -10,6 +10,8 @@ import io.github.streetinman.skyblockpv.core.dungeons.DungeonData;
  * @param skillXp  skill name (e.g. {@code FARMING}) → total XP. Empty when skills API is off.
  * @param slayerXp        XP per slayer boss
  * @param attributeStacks hunting-shard ID → shards syphoned into its attribute
+ * @param pets            every pet in the pet menu
+ * @param essence         essence type (e.g. {@code WITHER}) → amount
  */
 public record MemberData(
 		String uuid,
@@ -21,5 +23,7 @@ public record MemberData(
 		TrophyFishing trophyFishing,
 		DungeonData dungeons,
 		Map<Slayer, Long> slayerXp,
-		Map<String, Integer> attributeStacks) {
+		Map<String, Integer> attributeStacks,
+		java.util.List<Pet> pets,
+		Map<String, Long> essence) {
 }

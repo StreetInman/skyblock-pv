@@ -140,7 +140,7 @@ class DungeonCalculatorTest {
 				TestNbt.item(397, "CATACOMBS_EXPERT_RING", "r"))));
 		var inventory = ItemDecoder.decodeInventory(TestNbt.inventory(Arrays.asList(
 				TestNbt.enchanted(267, "HYPERION", "hecatomb", 7))));
-		Inventories inv = new Inventories(inventory, List.of(), List.of(), List.of(), null, bag, Map.of(), Set.of());
+		Inventories inv = new Inventories(inventory, List.of(), List.of(), List.of(), null, bag, Map.of(), null, Map.of(), Map.of(), Set.of());
 		DungeonData dungeons = new DungeonData(0, Map.of(), null, 0, Map.of(), Map.of(), Map.of(),
 				Map.of("toxophilite", 3, "cold_efficiency", 5));
 
@@ -158,7 +158,7 @@ class DungeonCalculatorTest {
 		assertEquals(8, b.graduateLevel());
 		assertEquals(2, b.explorerLevel());
 
-		XpBoosts none = XpBoosts.detect(dungeons, new Inventories(null, null, null, null, null, null, Map.of(), Set.of()),
+		XpBoosts none = XpBoosts.detect(dungeons, Inventories.empty(),
 				Map.of(), "Aatrox", 1.0, 10, -1, 0, XpBoosts.DEFAULT_TEAM_SHARE);
 		assertFalse(none.expertRing());
 		assertEquals(10, none.graduateLevel(), "a config override wins over the profile");

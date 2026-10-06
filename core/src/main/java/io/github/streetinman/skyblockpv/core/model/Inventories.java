@@ -12,6 +12,9 @@ import java.util.Set;
  * @param armor       helmet, chestplate, leggings, boots (re-ordered from the API's boots-first)
  * @param equipment   necklace, cloak, belt, gloves/bracelet
  * @param backpacks   backpack index → contents
+ * @param personalVault personal vault contents
+ * @param bags        other bags under {@code bag_contents} (fishing bag, quiver…) by API name
+ * @param sacks       sack item ID → amount stored
  * @param unknownKeys keys under {@code inventory} this version doesn't understand yet
  *                    (e.g. new features such as loadouts), surfaced for debugging
  */
@@ -23,7 +26,14 @@ public record Inventories(
 		Wardrobe wardrobe,
 		List<SkyblockItem> accessoryBag,
 		Map<Integer, List<SkyblockItem>> backpacks,
+		List<SkyblockItem> personalVault,
+		Map<String, List<SkyblockItem>> bags,
+		Map<String, Long> sacks,
 		Set<String> unknownKeys) {
+
+	public static Inventories empty() {
+		return new Inventories(null, null, null, null, null, null, Map.of(), null, Map.of(), Map.of(), Set.of());
+	}
 
 	public boolean apiEnabled() {
 		return inventory != null;

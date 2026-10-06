@@ -8,9 +8,12 @@ import java.util.Map;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
+import org.lwjgl.glfw.GLFW;
 
 import io.github.streetinman.skyblockpv.SkyblockPvClient;
 import io.github.streetinman.skyblockpv.config.PvConfig;
@@ -65,6 +68,7 @@ public class PvScreen extends Screen {
 	}
 
 	private final String requestedName;
+	private final ProfileService service;
 	private final PvConfig config;
 	private final ItemStacks.Cache stacks = new ItemStacks.Cache();
 	private ProfileService.Lookup lookup;
@@ -74,6 +78,8 @@ public class PvScreen extends Screen {
 	private String error;
 	private Tab tab = Tab.OVERVIEW;
 	private int page;
+	private EditBox searchBox;
+	private String searchText = "";
 
 	private int left;
 	private int top;
@@ -83,6 +89,7 @@ public class PvScreen extends Screen {
 	public PvScreen(String playerName, ProfileService service, PvConfig config) {
 		super(Component.literal("Profile Viewer: " + playerName));
 		this.requestedName = playerName;
+		this.service = service;
 		this.config = config;
 		service.lookup(playerName).whenCompleteAsync((result, failure) -> {
 			if (failure != null) {
@@ -139,6 +146,16 @@ public class PvScreen extends Screen {
 			x += w + 2;
 		}
 
+		// Look up someone else without closing the window.
+		searchBox = new EditBox(font, left + PANEL_WIDTH - 200, top + 4, 100, 16, Component.literal("Player name"));
+		searchBox.setMaxLength(16);
+		searchBox.setHint(Component.literal("§7Search player…"));
+		searchBox.setValue(searchText);
+		searchBox.setResponder(text -> searchText = text);
+		addRenderableWidget(searchBox);
+		addRenderableWidget(Button.builder(Component.literal("Go"), b -> search())
+				.bounds(left + PANEL_WIDTH - 98, top + 4, 24, 16).build());
+
 		if (lookup != null && lookup.profiles().size() > 1) {
 			addRenderableWidget(Button.builder(Component.literal("Profile ▸"), b -> {
 				int i = lookup.profiles().indexOf(profile);
@@ -158,6 +175,22 @@ public class PvScreen extends Screen {
 				rebuildWidgets();
 			}).bounds(left + PANEL_WIDTH - 26, top + PANEL_HEIGHT - 20, 20, 16).build());
 		}
+	}
+
+	private void search() {
+		String name = searchText.trim();
+		if (name.isEmpty()) return;
+		Minecraft.getInstance().gui.setScreen(new PvScreen(name, service, config));
+	}
+
+	@Override
+	public boolean keyPressed(KeyEvent event) {
+		if (searchBox != null && searchBox.isFocused()
+				&& (event.key() == GLFW.GLFW_KEY_ENTER || event.key() == GLFW.GLFW_KEY_KP_ENTER)) {
+			search();
+			return true;
+		}
+		return super.keyPressed(event);
 	}
 
 	@Override

@@ -18,7 +18,22 @@ jobs:
           distribution: temurin
           java-version: 25
       - uses: gradle/actions/setup-gradle@v4
-      - run: ./gradlew build -Pmc=${{ matrix.mc }} --stacktrace
+      - run: set -o pipefail; ./gradlew build -Pmc=${{ matrix.mc }} --stacktrace 2>&1 | tee build.log
+      - name: Report compile errors
+        if: failure()
+        # Turn each javac error (with its symbol/location lines) into one annotation, so it shows
+        # on the run page without opening the full log.
+        run: |
+          grep -A4 ': error:' build.log | awk 'BEGIN{RS="--\n"} {gsub(/\n/, "%0A"); print "::error title=javac " "${{ matrix.mc }}" "::" $0}' | head -50
+      - name: Show Minecraft API for version differences
+        if: failure()
+        run: |
+          jar=$(find ~/.gradle/caches .gradle -name 'minecraft-*.jar' -path '*${{ matrix.mc }}*' 2>/dev/null | grep -v sources | head -1)
+          echo "::notice title=minecraft jar ${{ matrix.mc }}::${jar:-none} | $(find ~/.gradle/caches .gradle -name 'minecraft*.jar' 2>/dev/null | head -8 | tr '\n' '|')"
+          for c in net.minecraft.client.Minecraft net.minecraft.client.gui.Gui net.minecraft.data.registries.VanillaRegistries net.minecraft.client.multiplayer.ClientPacketListener net.minecraft.client.gui.screens.Screen net.minecraft.client.gui.components.EditBox; do
+            out=$(javap -cp "$jar" "$c" 2>&1 | grep -E 'setScreen|createLookup|registryAccess|getConnection|keyPressed|setHint|setResponder|EditBox\(|class ' | tr '\n' '|' | sed 's/%/%25/g')
+            echo "::notice title=$c ${{ matrix.mc }}::$out"
+          done
       - uses: actions/upload-artifact@v4
         with:
           name: skyblock-pv-mc${{ matrix.mc }}

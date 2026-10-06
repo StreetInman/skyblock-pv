@@ -17,6 +17,7 @@ import io.github.streetinman.skyblockpv.core.dungeons.DungeonClass;
 import io.github.streetinman.skyblockpv.core.dungeons.DungeonData;
 import io.github.streetinman.skyblockpv.core.model.Inventories;
 import io.github.streetinman.skyblockpv.core.model.MemberData;
+import io.github.streetinman.skyblockpv.core.model.Pet;
 import io.github.streetinman.skyblockpv.core.model.Profile;
 import io.github.streetinman.skyblockpv.core.model.SkyblockItem;
 import io.github.streetinman.skyblockpv.core.model.Slayer;
@@ -94,7 +95,32 @@ public final class ProfileParser {
 				parseTrophyFish(obj(member, "trophy_fish")),
 				parseDungeons(member),
 				parseSlayers(path(member, "slayer", "slayer_bosses")),
-				parseAttributeStacks(path(member, "attributes", "stacks")));
+				parseAttributeStacks(path(member, "attributes", "stacks")),
+				parsePets(path(member, "pets_data")),
+				parseEssence(path(member, "currencies", "essence")));
+	}
+
+	static List<Pet> parsePets(JsonObject petsData) {
+		if (petsData == null || !petsData.has("pets") || !petsData.get("pets").isJsonArray()) return List.of();
+		List<Pet> pets = new ArrayList<>();
+		for (JsonElement e : petsData.getAsJsonArray("pets")) {
+			if (!e.isJsonObject()) continue;
+			JsonObject p = e.getAsJsonObject();
+			pets.add(new Pet(str(p, "type"), str(p, "tier"), num(p, "exp"),
+					p.has("active") && p.get("active").isJsonPrimitive() && p.get("active").getAsBoolean(),
+					str(p, "heldItem"), str(p, "skin")));
+		}
+		return List.copyOf(pets);
+	}
+
+	static Map<String, Long> parseEssence(JsonObject essence) {
+		Map<String, Long> result = new TreeMap<>();
+		if (essence != null) {
+			for (Map.Entry<String, JsonElement> e : essence.entrySet()) {
+				if (e.getValue().isJsonObject()) result.put(e.getKey(), (long) num(e.getValue().getAsJsonObject(), "current"));
+			}
+		}
+		return Collections.unmodifiableMap(result);
 	}
 
 	static Map<String, Integer> parseAttributeStacks(JsonObject stacks) {
@@ -175,7 +201,7 @@ public final class ProfileParser {
 
 	static Inventories parseInventories(JsonObject inv) throws IOException {
 		if (inv == null) {
-			return new Inventories(null, null, null, null, null, null, Map.of(), Set.of());
+			return Inventories.empty();
 		}
 
 		List<SkyblockItem> armor = decodeField(inv, "inv_armor");
@@ -200,6 +226,21 @@ public final class ProfileParser {
 		}
 
 		JsonObject bags = obj(inv, "bag_contents");
+		Map<String, List<SkyblockItem>> otherBags = new TreeMap<>();
+		if (bags != null) {
+			for (String key : bags.keySet()) {
+				if (key.equals("talisman_bag")) continue;
+				List<SkyblockItem> items = decodeField(bags, key);
+				if (items != null) otherBags.put(key, items);
+			}
+		}
+		Map<String, Long> sacks = new TreeMap<>();
+		JsonObject sackCounts = obj(inv, "sacks_counts");
+		if (sackCounts != null) {
+			for (Map.Entry<String, JsonElement> e : sackCounts.entrySet()) {
+				if (e.getValue().isJsonPrimitive() && e.getValue().getAsLong() > 0) sacks.put(e.getKey(), e.getValue().getAsLong());
+			}
+		}
 		return new Inventories(
 				decodeField(inv, "inv_contents"),
 				armor,
@@ -209,6 +250,9 @@ public final class ProfileParser {
 						inv.has("wardrobe_equipped_slot") ? inv.get("wardrobe_equipped_slot").getAsInt() : -1),
 				bags == null ? null : decodeField(bags, "talisman_bag"),
 				Collections.unmodifiableMap(backpacks),
+				decodeField(inv, "personal_vault_contents"),
+				Collections.unmodifiableMap(otherBags),
+				Collections.unmodifiableMap(sacks),
 				Collections.unmodifiableSet(unknown));
 	}
 
