@@ -10,7 +10,6 @@ import net.azureaaron.legacyitemdfu.TypeReferences;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.component.DataComponents;
-import net.minecraft.data.registries.VanillaRegistries;
 import net.minecraft.nbt.ByteArrayTag;
 import net.minecraft.nbt.ByteTag;
 import net.minecraft.nbt.CompoundTag;
@@ -33,6 +32,7 @@ import net.minecraft.world.item.component.ItemLore;
 import net.minecraft.world.item.component.TooltipDisplay;
 
 import io.github.streetinman.skyblockpv.SkyblockPvClient;
+import io.github.streetinman.skyblockpv.compat.Compat;
 import io.github.streetinman.skyblockpv.core.model.SkyblockItem;
 import io.github.streetinman.skyblockpv.core.nbt.NbtCompound;
 
@@ -69,7 +69,9 @@ public final class ItemStacks {
 	}
 
 	private static ItemStack fix(CompoundTag nbt) {
-		RegistryOps<Tag> ops = registries().createSerializationContext(NbtOps.INSTANCE);
+		HolderLookup.Provider registries = registries();
+		if (registries == null) return ItemStack.EMPTY;
+		RegistryOps<Tag> ops = registries.createSerializationContext(NbtOps.INSTANCE);
 		Dynamic<Tag> fixed = LegacyItemStackFixer.getFixer().update(TypeReferences.LEGACY_ITEM_STACK, new Dynamic<>(ops, nbt),
 				LegacyItemStackFixer.getFirstVersion(), LegacyItemStackFixer.getLatestVersion());
 		return ItemStack.CODEC.parse(fixed)
@@ -80,7 +82,7 @@ public final class ItemStacks {
 	private static HolderLookup.Provider registries() {
 		Minecraft mc = Minecraft.getInstance();
 		if (mc.getConnection() != null) return mc.getConnection().registryAccess();
-		if (fallbackLookup == null) fallbackLookup = VanillaRegistries.createLookup();
+		if (fallbackLookup == null) fallbackLookup = Compat.vanillaRegistries();
 		return fallbackLookup;
 	}
 

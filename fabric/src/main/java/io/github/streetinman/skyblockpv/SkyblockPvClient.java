@@ -19,10 +19,12 @@ import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 
+import io.github.streetinman.skyblockpv.compat.Compat;
 import io.github.streetinman.skyblockpv.config.PvConfig;
 import io.github.streetinman.skyblockpv.core.api.HypixelClient;
 import io.github.streetinman.skyblockpv.core.api.MojangClient;
 import io.github.streetinman.skyblockpv.core.api.ProfileService;
+import io.github.streetinman.skyblockpv.core.networth.PriceClient;
 import io.github.streetinman.skyblockpv.gui.PvScreen;
 
 /**
@@ -38,6 +40,7 @@ public final class SkyblockPvClient implements ClientModInitializer {
 
 	private static PvConfig config;
 	private static ProfileService profiles;
+	private static PriceClient prices;
 
 	@Override
 	public void onInitializeClient() {
@@ -45,7 +48,9 @@ public final class SkyblockPvClient implements ClientModInitializer {
 		config = PvConfig.load(configFile);
 
 		HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
-		profiles = new ProfileService(new MojangClient(http), new HypixelClient(http, () -> config.apiBaseUrl, () -> config.apiKey));
+		HypixelClient hypixel = new HypixelClient(http, () -> config.apiBaseUrl, () -> config.apiKey);
+		profiles = new ProfileService(new MojangClient(http), hypixel);
+		prices = new PriceClient(http, hypixel, () -> config.lowestBinUrl);
 
 		ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
 			// Other SkyBlock mods often claim /pv too, so the same command is also on /spv and /sbpv.
@@ -64,7 +69,7 @@ public final class SkyblockPvClient implements ClientModInitializer {
 	public static int open(String player) {
 		Minecraft mc = Minecraft.getInstance();
 		// Open next tick: the chat screen closes after the command runs and would replace ours.
-		mc.schedule(() -> mc.gui.setScreen(new PvScreen(player, profiles, config)));
+		mc.schedule(() -> Compat.setScreen(new PvScreen(player, profiles, config)));
 		return 1;
 	}
 
@@ -87,6 +92,10 @@ public final class SkyblockPvClient implements ClientModInitializer {
 			}
 		}));
 		return 1;
+	}
+
+	public static PriceClient prices() {
+		return prices;
 	}
 
 	public static String rootMessage(Throwable error) {

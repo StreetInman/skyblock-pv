@@ -43,6 +43,11 @@ public final class HypixelClient {
 		return resources.get(name, n -> get("/v2/resources/skyblock/" + n, false));
 	}
 
+	/** {@code /v2/skyblock/bazaar}: every bazaar product's current prices. No key needed. */
+	public CompletableFuture<JsonObject> bazaar() {
+		return get("/v2/skyblock/bazaar", false);
+	}
+
 	/** Forget cached data for a player, e.g. when the user presses refresh. */
 	public void invalidate(String uuid) {
 		profiles.invalidate(uuid);

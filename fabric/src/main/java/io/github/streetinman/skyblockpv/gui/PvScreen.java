@@ -13,9 +13,9 @@ import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
-import org.lwjgl.glfw.GLFW;
 
 import io.github.streetinman.skyblockpv.SkyblockPvClient;
+import io.github.streetinman.skyblockpv.compat.Compat;
 import io.github.streetinman.skyblockpv.config.PvConfig;
 import io.github.streetinman.skyblockpv.core.api.ProfileService;
 import io.github.streetinman.skyblockpv.core.dungeons.DungeonCalculator;
@@ -31,6 +31,9 @@ import io.github.streetinman.skyblockpv.core.model.SkyblockItem;
 import io.github.streetinman.skyblockpv.core.model.Slayer;
 import io.github.streetinman.skyblockpv.core.model.TrophyFish;
 import io.github.streetinman.skyblockpv.core.model.TrophyFishing;
+import io.github.streetinman.skyblockpv.core.networth.Networth;
+import io.github.streetinman.skyblockpv.core.networth.NetworthCalculator;
+import io.github.streetinman.skyblockpv.core.networth.Prices;
 import io.github.streetinman.skyblockpv.item.ItemStacks;
 
 /**
@@ -46,6 +49,9 @@ public class PvScreen extends Screen {
 	private static final int ACCESSORIES_PER_PAGE = 54;
 	/** The API stores every ender chest page back to back; the game shows 45 slots per page. */
 	private static final int ENDER_CHEST_PAGE = 45;
+	// GLFW key codes; LWJGL isn't on the compile classpath for every Minecraft version.
+	private static final int KEY_ENTER = 257;
+	private static final int KEY_KP_ENTER = 335;
 	private static final String[] ROMAN = {"0", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"};
 
 	private enum Tab {
@@ -75,6 +81,9 @@ public class PvScreen extends Screen {
 	private Profile profile;
 	private DungeonPlan dungeonPlan;
 	private List<StoragePage> storagePages = List.of();
+	private Prices prices;
+	private Networth networth;
+	private String networthError;
 	private String error;
 	private Tab tab = Tab.OVERVIEW;
 	private int page;
@@ -101,6 +110,15 @@ public class PvScreen extends Screen {
 			}
 			rebuildWidgets();
 		}, Minecraft.getInstance());
+		SkyblockPvClient.prices().prices().whenCompleteAsync((result, failure) -> {
+			if (failure != null) {
+				networthError = SkyblockPvClient.rootMessage(failure);
+				SkyblockPvClient.LOGGER.warn("Couldn't load prices for networth", failure);
+			} else {
+				prices = result;
+				if (profile != null) networth = NetworthCalculator.calculate(profile.member(), profile.bankBalance(), prices);
+			}
+		}, Minecraft.getInstance());
 	}
 
 	private void selectProfile(Profile p) {
@@ -115,6 +133,7 @@ public class PvScreen extends Screen {
 				DungeonCalculator.runsToCatacombs50(d.catacombsXp(), d.masterCompletions().getOrDefault(7, 0), DungeonCalculator.M7_BASE_XP, boosts),
 				DungeonCalculator.classAverage50(d.classXp(), DungeonCalculator.M7_BASE_XP, boosts));
 		storagePages = storagePages(m.inventories());
+		networth = prices == null ? null : NetworthCalculator.calculate(m, p.bankBalance(), prices);
 	}
 
 	private static List<StoragePage> storagePages(Inventories inv) {
@@ -180,13 +199,13 @@ public class PvScreen extends Screen {
 	private void search() {
 		String name = searchText.trim();
 		if (name.isEmpty()) return;
-		Minecraft.getInstance().gui.setScreen(new PvScreen(name, service, config));
+		Compat.setScreen(new PvScreen(name, service, config));
 	}
 
 	@Override
 	public boolean keyPressed(KeyEvent event) {
 		if (searchBox != null && searchBox.isFocused()
-				&& (event.key() == GLFW.GLFW_KEY_ENTER || event.key() == GLFW.GLFW_KEY_KP_ENTER)) {
+				&& (event.key() == KEY_ENTER || event.key() == KEY_KP_ENTER)) {
 			search();
 			return true;
 		}
@@ -211,7 +230,7 @@ public class PvScreen extends Screen {
 			g.text(font, "§a" + profile.cuteName() + mode, left + 6, top + 18, WHITE, false);
 			int contentTop = top + 32;
 			switch (tab) {
-				case OVERVIEW -> drawOverview(g, contentTop);
+				case OVERVIEW -> drawOverview(g, contentTop, mouseX, mouseY);
 				case SKILLS -> drawSkills(g, contentTop);
 				case DUNGEONS -> drawDungeons(g, contentTop, mouseX, mouseY);
 				case INVENTORY -> drawInventory(g, contentTop, mouseX, mouseY);
@@ -231,12 +250,14 @@ public class PvScreen extends Screen {
 		}
 	}
 
-	private void drawOverview(GuiGraphicsExtractor g, int y) {
+	private void drawOverview(GuiGraphicsExtractor g, int y, int mouseX, int mouseY) {
 		MemberData m = profile.member();
 		DungeonData d = m.dungeons();
 		double average = skills().stream().mapToInt(SkillLevel::level).average().orElse(0);
 		List<String> stats = List.of(
 				"§bSkyBlock Level: §f" + decimal(m.skyblockLevel()),
+				"§6Networth: " + (networth != null ? "§f" + compact((long) networth.total()) + " §8(hover)"
+						: networthError != null ? "§7unavailable" : "§7loading…"),
 				"§6Purse: §f" + coins(m.purse()),
 				"§6Bank: §f" + (profile.bankBalance() == null ? "§7API off / none" : coins(profile.bankBalance())),
 				"§dFairy Souls: §f" + m.fairySouls(),
@@ -245,6 +266,10 @@ public class PvScreen extends Screen {
 				"§cClass Average: §f" + decimal(d.classAverage()),
 				"§3Trophy Fish: §f" + m.trophyFishing().totalCaught() + " §7(" + m.trophyFishing().rankName() + ")");
 		drawLines(g, stats, left + 8, y);
+		// The networth line is the second one.
+		if (mouseX >= left + 8 && mouseX < left + 8 + font.width(stats.get(1)) && mouseY >= y + 11 && mouseY < y + 22) {
+			hoveredText = networthTooltip();
+		}
 
 		List<String> slayers = new ArrayList<>();
 		slayers.add("§5Slayers");
@@ -360,6 +385,29 @@ public class PvScreen extends Screen {
 		if (mouseX >= x && mouseX < left + PANEL_WIDTH && mouseY >= startY && mouseY < y) {
 			hoveredText = calculatorTooltip(b);
 		}
+	}
+
+	private List<Component> networthTooltip() {
+		List<Component> lines = new ArrayList<>();
+		if (networth == null) {
+			lines.add(Component.literal(networthError != null ? "§cCouldn't load prices: " + networthError : "§7Loading prices…"));
+			return lines;
+		}
+		lines.add(Component.literal("§6Networth: §f" + coins(networth.total())));
+		for (Map.Entry<Networth.Category, Double> e : networth.categories().entrySet()) {
+			if (e.getValue() >= 1) lines.add(Component.literal("§7" + e.getKey().displayName + ": §f" + compact(e.getValue().longValue())));
+		}
+		if (!networth.topItems().isEmpty()) {
+			lines.add(Component.literal(""));
+			lines.add(Component.literal("§eMost valuable:"));
+			for (Networth.Valued v : networth.topItems()) {
+				lines.add(Component.literal("§f" + v.name() + " §7" + compact((long) v.value())));
+			}
+		}
+		lines.add(Component.literal(""));
+		lines.add(Component.literal("§8Estimate from lowest BIN and bazaar prices,"));
+		lines.add(Component.literal("§8plus enchants, books, gems, stars and scrolls."));
+		return lines;
 	}
 
 	private List<Component> calculatorTooltip(XpBoosts b) {
@@ -544,6 +592,7 @@ public class PvScreen extends Screen {
 	}
 
 	private static String compact(long value) {
+		if (value >= 1_000_000_000) return String.format(Locale.ROOT, "%.2fB", value / 1_000_000_000.0);
 		if (value >= 1_000_000) return String.format(Locale.ROOT, "%.1fM", value / 1_000_000.0);
 		if (value >= 1_000) return String.format(Locale.ROOT, "%.1fk", value / 1_000.0);
 		return Long.toString(value);

@@ -21,6 +21,8 @@ public final class PvConfig {
 
 	public String apiKey = "";
 	public String apiBaseUrl = HypixelClient.HYPIXEL_BASE_URL;
+	/** Lowest BIN prices for networth, as a flat {"ITEM_ID": price} JSON object (NEU format). */
+	public String lowestBinUrl = "https://sky.coflnet.com/api/prices/neu";
 
 	// Dungeon calculator. Perks, Hecatomb, Scarf, Expert Ring, shard attributes and Derpy are read
 	// from the profile automatically; these cover what the API can't see or gets wrong.
