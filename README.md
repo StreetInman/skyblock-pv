@@ -11,7 +11,7 @@ that player's stats and gear, without leaving the game. Builds are available for
 
 | Tab | Shows |
 |---|---|
-| Stats | SkyBlock level, **networth** (hover for a breakdown), purse, bank, fairy souls, skill average, Catacombs, class average, trophy fish rank, all slayer levels |
+| Stats | SkyBlock level, **networth** (hover for a breakdown), magical power, selected power, tuning, active pet, purse, bank, fairy souls, skill average, Catacombs, class average, trophy fish rank, all slayer levels |
 | Skills | Every skill with level and progress to the next level |
 | Dungeons | Catacombs and class levels, secrets, runs, best M7 S+, and an **M7 calculator** (below) |
 | Inv | Armor, equipment (necklace, cloak, belt, gloves), inventory and hotbar |
@@ -47,6 +47,17 @@ Hover the calculator to see exactly which boosts were found. Boosts the API can'
 `dungeonTeamShare`. If the shard levels it shows are wrong, set `dungeonGraduateLevel` and
 `dungeonExplorerLevel` (0–10; `-1` means read from the profile).
 
+### Settings (`/skyblockpv`)
+
+`/skyblockpv` opens the mod's settings. Everything there is cosmetic and only changes what you see:
+
+- **Player size**: shrink or enlarge your own player model (optionally everyone's). Hitboxes and
+  movement are unchanged; only the drawn model is scaled.
+- **First-person items**: item size, X/Y/Z position, X/Y/Z rotation, swing animation speed, and
+  skipping the dip when you switch items. On 26.1.2 and 26.2 swing speed can be slower or faster;
+  on 26.3, where swing timing is tied into combat, only the drawn animation is sped up, so it can only
+  be made faster.
+
 ### Networth
 
 Networth is an estimate, in the same style as networth mods and sites. Each item counts at its
@@ -64,8 +75,10 @@ policy bans mods that give an advantage, automate actions, or change how the cli
 talks to the server. This mod does none of those:
 
 - It reads the **official public Hypixel API** over HTTPS, the same data sites like SkyCrypt use.
-- It only draws its own screen. It never sends packets to the server, never clicks or types
-  for you, and never reveals information the game hides.
+- It only draws its own screen and changes how things look on your screen. It never sends
+  packets to the server, never clicks or types for you, and never reveals information the game
+  hides. Player size and item animations don't touch hitboxes, attack timing or anything the
+  server sees.
 
 As with any mod, Hypixel says all mods are used at your own risk.
 
@@ -87,6 +100,7 @@ As with any mod, Hypixel says all mods are used at your own risk.
 | `/pv` | Opens your own profile |
 | `/pv <player>` | Opens another player's profile |
 | `/spv`, `/sbpv` | Same as `/pv`, for when another mod has taken `/pv` |
+| `/skyblockpv` | Opens the settings (player size, item animations) |
 | `/pvdump <player>` | Saves the raw API response to `config/skyblock-pv/dumps/` (for debugging) |
 
 ## Privacy
