@@ -83,7 +83,8 @@ final class SelfTest {
 	private static void run(Minecraft mc) {
 		switch (phase) {
 			case 0 -> {
-				if (screen instanceof TitleScreen) {
+				// A fresh game shows the accessibility onboarding screen instead of the title screen.
+				if (screen instanceof TitleScreen || screen instanceof net.minecraft.client.gui.screens.AccessibilityOnboardingScreen) {
 					sample = sampleLookup();
 					next("opening /pv");
 				}
