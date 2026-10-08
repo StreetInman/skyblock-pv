@@ -1,0 +1,12 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "io.github.streetinman.skyblockpv.mixin.compat",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "FirstPersonHandsMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
