@@ -44,3 +44,38 @@ jobs:
         with:
           name: skyblock-pv-mc${{ matrix.mc }}
           path: fabric/build/libs/skyblock-pv-*[0-9].jar
+
+  # Starts the game once per version under a virtual display to make sure every mixin applies.
+  # Mixin targets are only checked at runtime, so a green compile alone can still crash on launch.
+  smoke:
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        mc: ['26.1.2', '26.2', '26.3']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 25
+      - uses: gradle/actions/setup-gradle@v4
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq xvfb mesa-utils libgl1-mesa-dri > /dev/null
+      - name: Launch the client
+        run: |
+          mkdir -p fabric/run
+          echo "eula=true" > fabric/run/eula.txt
+          (timeout 300 xvfb-run -a -s "-screen 0 1280x720x24" ./gradlew :fabric:runClient -Pmc=${{ matrix.mc }} \
+            -Dmixin.debug.verify=true > client.log 2>&1 || true)
+          if grep -qE "Mixin apply.*failed|InvalidInjectionException|InvalidMixinException|Game crashed|Could not execute entrypoint|Incompatible mods" client.log; then
+            grep -E -A6 "Mixin apply.*failed|InvalidInjection|InvalidMixin|Game crashed|Could not execute entrypoint|Incompatible mods|Caused by" client.log | head -60 | awk '{printf "%s%%0A", $0}' | sed 's/^/::error title=launch ${{ matrix.mc }}::/'
+            echo
+            exit 1
+          fi
+          if grep -qE "Created: .*textures/atlas|Sound engine started|Loaded [0-9]+ recipes|Narrator library" client.log; then
+            echo "::notice title=launch ${{ matrix.mc }}::Client started with skyblockpv mixins applied"
+          else
+            tail -40 client.log | awk '{printf "%s%%0A", $0}' | sed 's/^/::warning title=launch ${{ matrix.mc }} (no start marker)::/'
+            echo
+          fi
