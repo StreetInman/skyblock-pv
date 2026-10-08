@@ -26,9 +26,11 @@ import io.github.streetinman.skyblockpv.core.api.MojangClient;
 import io.github.streetinman.skyblockpv.core.api.ProfileService;
 import io.github.streetinman.skyblockpv.core.networth.PriceClient;
 import io.github.streetinman.skyblockpv.gui.PvScreen;
+import io.github.streetinman.skyblockpv.gui.SettingsScreen;
 
 /**
- * Registers {@code /pv [player]} (also {@code /spv} and {@code /sbpv}) and {@code /pvdump <player>}.
+ * Registers {@code /pv [player]} (also {@code /spv} and {@code /sbpv}), {@code /skyblockpv} for
+ * settings, and {@code /pvdump <player>}.
  *
  * <p>Everything here is read-only: the mod calls the public Hypixel API over HTTPS and draws its
  * own screen. It never sends packets to the server or acts on the player's behalf.
@@ -39,12 +41,13 @@ public final class SkyblockPvClient implements ClientModInitializer {
 	private static final String[] COMMAND_NAMES = {"pv", "spv", "sbpv"};
 
 	private static PvConfig config;
+	private static Path configFile;
 	private static ProfileService profiles;
 	private static PriceClient prices;
 
 	@Override
 	public void onInitializeClient() {
-		Path configFile = FabricLoader.getInstance().getConfigDir().resolve("skyblock-pv.json");
+		configFile = FabricLoader.getInstance().getConfigDir().resolve("skyblock-pv.json");
 		config = PvConfig.load(configFile);
 
 		HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
@@ -60,6 +63,11 @@ public final class SkyblockPvClient implements ClientModInitializer {
 						.then(ClientCommands.argument("player", StringArgumentType.word())
 								.executes(ctx -> open(StringArgumentType.getString(ctx, "player")))));
 			}
+			dispatcher.register(ClientCommands.literal("skyblockpv").executes(ctx -> {
+				Minecraft mc = Minecraft.getInstance();
+				mc.schedule(() -> Compat.setScreen(new SettingsScreen(config, SkyblockPvClient::saveConfig)));
+				return 1;
+			}));
 			dispatcher.register(ClientCommands.literal("pvdump")
 					.then(ClientCommands.argument("player", StringArgumentType.word())
 							.executes(SkyblockPvClient::dump)));
@@ -92,6 +100,15 @@ public final class SkyblockPvClient implements ClientModInitializer {
 			}
 		}));
 		return 1;
+	}
+
+	/** Live settings, read every frame by the render mixins. */
+	public static PvConfig config() {
+		return config;
+	}
+
+	public static void saveConfig() {
+		config.save(configFile);
 	}
 
 	public static PriceClient prices() {

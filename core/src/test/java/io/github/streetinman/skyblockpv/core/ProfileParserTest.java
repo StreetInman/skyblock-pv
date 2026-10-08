@@ -41,6 +41,10 @@ class ProfileParserTest {
 		assertEquals(240, m.fairySouls());
 		assertEquals(55_172_425.0, m.skillXp().get("FARMING"));
 		assertEquals(Map.of("SHARD_SCARF", 32, "SHARD_BONZO", 4), m.attributeStacks());
+		assertEquals(1_234, m.power().magicalPower());
+		assertEquals("silky", m.power().selectedPower());
+		assertEquals(Map.of("strength", 30, "critical_damage", 12), m.power().tuning());
+		assertEquals(2, m.power().unlockedPowers());
 	}
 
 	@Test
@@ -183,6 +187,10 @@ class ProfileParserTest {
 		JsonObject slayer = com.google.gson.JsonParser.parseString(
 				"{\"slayer_bosses\": {\"zombie\": {\"xp\": 1500000}, \"wolf\": {\"xp\": 2000}}}").getAsJsonObject();
 		m.add("slayer", slayer);
+		m.add("accessory_bag_storage", com.google.gson.JsonParser.parseString("""
+				{"highest_magical_power": 1234, "selected_power": "silky", "unlocked_powers": ["silky", "bloody"],
+				 "tuning": {"slot_0": {"strength": 30, "critical_damage": 12, "health": 0}}}
+				""").getAsJsonObject());
 		m.add("attributes", com.google.gson.JsonParser.parseString(
 				"{\"stacks\": {\"SHARD_SCARF\": 32, \"SHARD_BONZO\": 4}}").getAsJsonObject());
 

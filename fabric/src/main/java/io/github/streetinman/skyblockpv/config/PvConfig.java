@@ -37,6 +37,47 @@ public final class PvConfig {
 	/** Share of a run's class XP that the classes you didn't play receive. */
 	public double dungeonTeamShare = io.github.streetinman.skyblockpv.core.dungeons.XpBoosts.DEFAULT_TEAM_SHARE;
 
+	/** Client-side look of player models. Only changes what you see; nothing is sent to the server. */
+	public PlayerModel playerModel = new PlayerModel();
+	/** Client-side first-person item position, size and swing animation. */
+	public ItemAnimations itemAnimations = new ItemAnimations();
+
+	public static final class PlayerModel {
+		/** Size of your own player model, 1 = normal. */
+		public double scale = 1.0;
+		/** Apply the same size to other players too. */
+		public boolean includeOtherPlayers = false;
+	}
+
+	public static final class ItemAnimations {
+		public boolean enabled = false;
+		/** Size of the held item and hand, 1 = normal. */
+		public double scale = 1.0;
+		/** Offsets in blocks. X is mirrored for the off hand so both move outward together. */
+		public double offsetX = 0;
+		public double offsetY = 0;
+		public double offsetZ = 0;
+		/** Rotations in degrees. */
+		public double rotationX = 0;
+		public double rotationY = 0;
+		public double rotationZ = 0;
+		/** Swing animation speed, 1 = normal, 2 = twice as fast. Visual only. */
+		public double swingSpeed = 1.0;
+		/** Skip the dip when switching items. */
+		public boolean noEquipAnimation = false;
+
+		public void reset() {
+			ItemAnimations defaults = new ItemAnimations();
+			boolean wasEnabled = enabled;
+			scale = defaults.scale;
+			offsetX = offsetY = offsetZ = 0;
+			rotationX = rotationY = rotationZ = 0;
+			swingSpeed = defaults.swingSpeed;
+			noEquipAnimation = false;
+			enabled = wasEnabled;
+		}
+	}
+
 	public static PvConfig load(Path file) {
 		try {
 			if (Files.exists(file)) {

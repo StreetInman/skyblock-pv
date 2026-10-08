@@ -282,6 +282,40 @@ public class PvScreen extends Screen {
 		}
 		slayers.add("§7Total: " + compact(totalSlayerXp) + " XP");
 		drawLines(g, slayers, Math.max(left + 180, left + 8 + widest(stats) + 16), y);
+
+		drawLines(g, accessoryLines(m), left + 8, y + stats.size() * 11 + 6);
+	}
+
+	/** Stat colour, symbol and short name for tuning points, keyed by the API's stat names. */
+	private static final Map<String, String> TUNING_STATS = Map.of(
+			"health", "§c❤", "defense", "§a❈", "walk_speed", "§f✦", "strength", "§c❁",
+			"critical_damage", "§9☠", "critical_chance", "§9☣", "attack_speed", "§e⚔", "intelligence", "§b✎");
+
+	private List<String> accessoryLines(MemberData m) {
+		var power = m.power();
+		List<String> lines = new ArrayList<>();
+		lines.add("§9Accessories");
+		lines.add("§7Magical Power: §f" + String.format(Locale.ROOT, "%,d", power.magicalPower()));
+		lines.add("§7Power: §f" + (power.selectedPower() == null ? "§8none" : titleCase(power.selectedPower()))
+				+ " §8(" + power.unlockedPowers() + " learned)");
+		StringBuilder tuning = new StringBuilder();
+		power.tuning().forEach((stat, points) -> tuning.append(TUNING_STATS.getOrDefault(stat, "§7" + stat))
+				.append("§f").append(points).append(' '));
+		lines.add("§7Tuning: " + (tuning.isEmpty() ? "§8none" : tuning.toString().trim()));
+		m.pets().stream().filter(io.github.streetinman.skyblockpv.core.model.Pet::active).findFirst().ifPresent(pet ->
+				lines.add("§7Active Pet: §f" + titleCase(pet.type()) + " §8(" + titleCase(pet.tier()) + ")"));
+		return lines;
+	}
+
+	private static String titleCase(String key) {
+		if (key == null || key.isEmpty()) return "?";
+		StringBuilder out = new StringBuilder();
+		for (String word : key.toLowerCase(Locale.ROOT).split("_")) {
+			if (word.isEmpty()) continue;
+			if (!out.isEmpty()) out.append(' ');
+			out.append(Character.toUpperCase(word.charAt(0))).append(word.substring(1));
+		}
+		return out.toString();
 	}
 
 	private void drawSkills(GuiGraphicsExtractor g, int y) {

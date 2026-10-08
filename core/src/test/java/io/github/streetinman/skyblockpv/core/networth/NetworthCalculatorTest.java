@@ -60,7 +60,7 @@ class NetworthCalculatorTest {
 		MemberData m = new MemberData("u", 0, 1_000, 0, Map.of(), inv, new TrophyFishing(Map.of(), 0, 0),
 				new DungeonData(0, Map.of(), null, 0, Map.of(), Map.of(), Map.of(), Map.of()), Map.of(), Map.of(),
 				List.of(new Pet("ENDER_DRAGON", "LEGENDARY", 0, true, "PET_ITEM_TIER_BOOST", null)),
-				Map.of("WITHER", 10L));
+				Map.of("WITHER", 10L), io.github.streetinman.skyblockpv.core.model.AccessoryPower.NONE);
 
 		Networth nw = NetworthCalculator.calculate(m, 5_000.0, PRICES);
 

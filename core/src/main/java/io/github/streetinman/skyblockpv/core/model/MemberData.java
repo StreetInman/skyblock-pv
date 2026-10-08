@@ -12,6 +12,7 @@ import io.github.streetinman.skyblockpv.core.dungeons.DungeonData;
  * @param attributeStacks hunting-shard ID → shards syphoned into its attribute
  * @param pets            every pet in the pet menu
  * @param essence         essence type (e.g. {@code WITHER}) → amount
+ * @param power           magical power, selected power stone and tuning
  */
 public record MemberData(
 		String uuid,
@@ -25,5 +26,6 @@ public record MemberData(
 		Map<Slayer, Long> slayerXp,
 		Map<String, Integer> attributeStacks,
 		java.util.List<Pet> pets,
-		Map<String, Long> essence) {
+		Map<String, Long> essence,
+		AccessoryPower power) {
 }

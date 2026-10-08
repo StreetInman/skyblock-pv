@@ -15,6 +15,7 @@ import com.google.gson.JsonObject;
 
 import io.github.streetinman.skyblockpv.core.dungeons.DungeonClass;
 import io.github.streetinman.skyblockpv.core.dungeons.DungeonData;
+import io.github.streetinman.skyblockpv.core.model.AccessoryPower;
 import io.github.streetinman.skyblockpv.core.model.Inventories;
 import io.github.streetinman.skyblockpv.core.model.MemberData;
 import io.github.streetinman.skyblockpv.core.model.Pet;
@@ -97,7 +98,23 @@ public final class ProfileParser {
 				parseSlayers(path(member, "slayer", "slayer_bosses")),
 				parseAttributeStacks(path(member, "attributes", "stacks")),
 				parsePets(path(member, "pets_data")),
-				parseEssence(path(member, "currencies", "essence")));
+				parseEssence(path(member, "currencies", "essence")),
+				parsePower(obj(member, "accessory_bag_storage")));
+	}
+
+	static AccessoryPower parsePower(JsonObject storage) {
+		if (storage == null) return AccessoryPower.NONE;
+		Map<String, Integer> tuning = new java.util.LinkedHashMap<>();
+		JsonObject slot = path(storage, "tuning", "slot_0");
+		if (slot != null) {
+			for (Map.Entry<String, JsonElement> e : slot.entrySet()) {
+				if (e.getValue().isJsonPrimitive() && e.getValue().getAsInt() != 0) tuning.put(e.getKey(), e.getValue().getAsInt());
+			}
+		}
+		int unlocked = storage.has("unlocked_powers") && storage.get("unlocked_powers").isJsonArray()
+				? storage.getAsJsonArray("unlocked_powers").size() : 0;
+		return new AccessoryPower((int) num(storage, "highest_magical_power"), str(storage, "selected_power"),
+				Collections.unmodifiableMap(tuning), unlocked);
 	}
 
 	static List<Pet> parsePets(JsonObject petsData) {
