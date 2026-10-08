@@ -70,17 +70,17 @@ jobs:
           export LIBGL_ALWAYS_SOFTWARE=1 SDL_VIDEODRIVER=x11 SKYBLOCKPV_SELFTEST=1
           (timeout 900 xvfb-run -a -s "-screen 0 1280x720x24 +extension GLX +render -noreset" ./gradlew :fabric:runClient -Pmc=${{ matrix.mc }} \
             -Dmixin.debug.verify=true > client.log 2>&1 || true)
+          # The self-test opens /pv with sample data, every tab, the item browser and the settings.
+          grep -E "SKYBLOCKPV SELFTEST" client.log | grep -v " tick [0-9]* screen" | head -30 | cut -c1-300 | sed 's/^/::notice title=selftest ${{ matrix.mc }}::/'
           if grep -qE "Mixin apply.*failed|InvalidInjectionException|InvalidMixinException|Game crashed|Could not execute entrypoint|Incompatible mods" client.log; then
-            grep -E -A6 "Mixin apply.*failed|InvalidInjection|InvalidMixin|Game crashed|Could not execute entrypoint|Incompatible mods|Caused by" client.log | head -60 | awk '{printf "%s%%0A", $0}' | sed 's/^/::error title=launch ${{ matrix.mc }}::/'
+            grep -E -A30 "Mixin apply.*failed|InvalidInjection|InvalidMixin|Game crashed|Could not execute entrypoint|Incompatible mods|Minecraft Crash Report" client.log | grep -v flite | cut -c1-300 | head -80 | awk '{printf "%s%%0A", $0}' | sed 's/^/::error title=launch ${{ matrix.mc }}::/'
             echo
             exit 1
           fi
-          # The self-test opens /pv with sample data, every tab, the item browser and the settings.
-          grep -E "SKYBLOCKPV SELFTEST" client.log | head -20 | sed 's/^/::notice title=selftest ${{ matrix.mc }}::/'
           if ! grep -q "SKYBLOCKPV SELFTEST PASSED" client.log; then
             grep -E -A40 "SELFTEST (STALL|FAILED)" client.log | head -60 | awk '{printf "%s%%0A", $0}' | sed 's/^/::error title=selftest ${{ matrix.mc }}::/'
             echo
-            grep -E "SELFTEST|Exception in|Caused by" client.log | tail -15 | awk '{printf "%s%%0A", $0}' | sed 's/^/::error title=selftest tail ${{ matrix.mc }}::/'
+            grep -E "SELFTEST|Exception in|Caused by" client.log | grep -v flite | cut -c1-300 | tail -15 | awk '{printf "%s%%0A", $0}' | sed 's/^/::error title=selftest tail ${{ matrix.mc }}::/'
             echo
             exit 1
           fi
