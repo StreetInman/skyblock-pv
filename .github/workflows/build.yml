@@ -32,6 +32,11 @@ jobs:
           [ -n "$jar" ] || { echo "::notice title=api probe ${{ matrix.mc }}::no merged jar"; exit 0; }
           grep -v '^#' .github/api-probe.txt | while read -r c pattern; do
             [ -n "$c" ] || continue
+            if [ "$c" = "find" ]; then
+              out=$(unzip -Z1 "$jar" | grep -E "$pattern" | grep -v '\$' | head -40 | tr '\n' '|')
+              echo "::notice title=find $pattern ${{ matrix.mc }}::$out"
+              continue
+            fi
             out=$(javap -p -cp "$jar" "$c" 2>&1 | grep -E "$pattern" | sed 's/^ *//' | tr '\n' '|' | sed 's/%/%25/g')
             echo "::notice title=$c ${{ matrix.mc }}::$out"
           done

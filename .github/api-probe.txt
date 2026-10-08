@@ -1,10 +1,6 @@
-# One probe per line: <class> <grep -E pattern>. CI prints matching `javap -p` lines as notices,
-# so Minecraft API differences between versions can be checked without a local game jar.
-net.minecraft.client.renderer.entity.LivingEntityRenderer extractRenderState|scale|class
-net.minecraft.client.renderer.entity.state.LivingEntityRenderState scale|class
-net.minecraft.client.renderer.entity.state.EntityRenderState  id;|entityType|class
-net.minecraft.client.renderer.entity.player.AvatarRenderer extractRenderState|scale|class
-net.minecraft.client.renderer.ItemInHandRenderer apply|renderArm|renderItem|renderHand|class
-net.minecraft.world.entity.LivingEntity SwingDuration|void swing|swingTime|class
-net.minecraft.client.gui.components.AbstractSliderButton .
-net.minecraft.client.gui.components.CycleButton onOffBuilder|booleanBuilder|create|class
+# One probe per line: <class> <grep -E pattern>, or `find <pattern>` to list matching class files.
+# CI prints the matching `javap -p` lines as notices, so Minecraft API differences between versions
+# can be checked without a local game jar.
+find InHand|HandRenderer|FirstPerson
+net.minecraft.world.entity.LivingEntity Swing|swing
+net.minecraft.world.item.component.SwingAnimation .
