@@ -37,7 +37,8 @@ jobs:
               echo "::notice title=find $pattern ${{ matrix.mc }}::$out"
               continue
             fi
-            out=$(javap -p -cp "$jar" "$c" 2>&1 | grep -E "$pattern" | grep -v 'lambda\$' | sed -e 's/^ *//' -e 's/net\.minecraft\.//g' -e 's/com\.mojang\.//g' | tr '\n' '|' | sed 's/%/%25/g')
+            cp="$jar:$(find ~/.gradle/caches/modules-2 -name 'authlib-*.jar' 2>/dev/null | head -1)"
+            out=$(javap -p -cp "$cp" "$c" 2>&1 | grep -E "$pattern" | grep -v 'lambda\$' | sed -e 's/^ *//' -e 's/net\.minecraft\.//g' -e 's/com\.mojang\.//g' | tr '\n' '|' | sed 's/%/%25/g')
             echo "::notice title=$c ${{ matrix.mc }}::$out"
           done
       - uses: actions/upload-artifact@v4
