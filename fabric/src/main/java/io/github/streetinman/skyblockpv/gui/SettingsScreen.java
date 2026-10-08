@@ -48,6 +48,16 @@ public class SettingsScreen extends Screen {
 	private int col1;
 	private int col2;
 
+	/** Shows the n-th category tab. Used by the launch self-test. */
+	public void showCategory(int index) {
+		category = Category.values()[Math.floorMod(index, Category.values().length)];
+		rebuildWidgets();
+	}
+
+	public static int categoryCount() {
+		return Category.values().length;
+	}
+
 	public SettingsScreen(PvConfig config, Runnable save) {
 		super(Component.literal("SkyBlock PV Settings"));
 		this.config = config;
@@ -85,7 +95,7 @@ public class SettingsScreen extends Screen {
 			}
 			case GUI -> {
 				PvConfig.Gui gui = config.gui;
-				addRenderableWidget(toggle(col1, y, "Player model in /pv", () -> gui.showPlayerModel, () -> gui.showPlayerModel = !gui.showPlayerModel));
+				addRenderableWidget(toggle(col1, y, "Summary sidebar in /pv", () -> gui.showPlayerModel, () -> gui.showPlayerModel = !gui.showPlayerModel));
 				List<String> tabs = PvScreen.tabLabels();
 				addRenderableWidget(Button.builder(Component.literal("/pv opens on: " + gui.defaultTab), b -> {
 					int i = tabs.indexOf(gui.defaultTab);

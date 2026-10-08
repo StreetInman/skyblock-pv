@@ -57,6 +57,8 @@ public final class SkyblockPvClient implements ClientModInitializer {
 		profiles = new ProfileService(new MojangClient(http), hypixel);
 		prices = new PriceClient(http, hypixel, () -> config.lowestBinUrl);
 
+		if ("1".equals(System.getenv("SKYBLOCKPV_SELFTEST"))) SelfTest.start();
+
 		ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
 			// Other SkyBlock mods often claim /pv too, so the same command is also on /spv and /sbpv.
 			for (String name : COMMAND_NAMES) {
@@ -122,6 +124,10 @@ public final class SkyblockPvClient implements ClientModInitializer {
 
 	public static void saveConfig() {
 		config.save(configFile);
+	}
+
+	public static ProfileService profiles() {
+		return profiles;
 	}
 
 	public static PriceClient prices() {

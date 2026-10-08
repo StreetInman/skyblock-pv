@@ -21,8 +21,8 @@ that player's stats and gear, without leaving the game. Builds are available for
 | Trophy | All 18 trophy fish with bronze/silver/gold/diamond counts and your Trophy Hunter rank |
 | Misc | Profile age, co-op size, deaths, kills, highest crit, items fished, gifts, essences, HOTM tier and powders, Kuudra tiers, Crimson faction and reputation, Jacob's medals and contests, minions crafted, sacks and more |
 
-A model of the player, wearing their skin and armor, stands beside the window and follows your
-cursor, with a short summary under it. The tab row spans the full width of the window.
+A summary column (level, networth, Catacombs, MP, skill average) sits beside the window, and the
+tab row spans the full width of the window.
 
 Search for another player from the box at the top of the window. Items show with their real icons, including custom player-head textures. Hover any item to see its full name and lore. If a player has more than one profile, use
 **Profile ▸** to switch between them.
@@ -58,7 +58,7 @@ Hover the calculator to see exactly which boosts were found. Boosts the API can'
 Animations, Dungeons, Garden, Mining and Fishing. New tweaks land in the tab they belong to.
 Everything there is client-side and only changes what you see:
 
-- **GUI**: show or hide the player model in `/pv`, and pick which tab `/pv` opens on.
+- **GUI**: show or hide the summary column in `/pv`, and pick which tab `/pv` opens on.
 - **Dungeons**: the M7 calculator's team share, global XP boost, extra class XP, and Graduate and
   Explorer levels (Auto reads them from the profile).
 

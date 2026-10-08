@@ -77,6 +77,20 @@ public class ItemBrowserScreen extends Screen {
 		SkyblockPvClient.prices().prices().thenAccept(p -> minecraft().execute(() -> prices = p));
 	}
 
+	/** True once items are loaded (or failed to). Used by the launch self-test. */
+	public boolean loaded() {
+		return repo != null || (status != null && status.startsWith("§c"));
+	}
+
+	public String status() {
+		return status;
+	}
+
+	/** Selects the n-th shown item, as clicking it would. */
+	public void selectShown(int index) {
+		if (index < shown.size()) select(shown.get(index), true);
+	}
+
 	private static net.minecraft.client.Minecraft minecraft() {
 		return net.minecraft.client.Minecraft.getInstance();
 	}

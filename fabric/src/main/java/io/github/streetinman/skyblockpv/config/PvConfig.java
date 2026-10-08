@@ -47,7 +47,7 @@ public final class PvConfig {
 	public ItemAnimations itemAnimations = new ItemAnimations();
 
 	public static final class Gui {
-		/** Show the viewed player's model next to the /pv window. */
+		/** Show the summary column (level, networth, Cata, MP, skill average) beside the /pv window. */
 		public boolean showPlayerModel = true;
 		/** Tab /pv opens on, by its label (e.g. "Stats", "Dungeons"). */
 		public String defaultTab = "Stats";

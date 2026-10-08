@@ -41,6 +41,7 @@ public final class Snbt {
 		Map<String, Object> map = new LinkedHashMap<>();
 		skipWhitespace();
 		while (peek() != '}') {
+			int before = pos;
 			skipWhitespace();
 			String key = peek() == '"' || peek() == '\'' ? quoted() : unquoted();
 			skipWhitespace();
@@ -49,6 +50,7 @@ public final class Snbt {
 			skipWhitespace();
 			if (peek() == ',') pos++;
 			skipWhitespace();
+			if (pos == before) throw error("Stuck");
 		}
 		expect('}');
 		return new NbtCompound(map);
@@ -64,10 +66,12 @@ public final class Snbt {
 			List<Object> values = new ArrayList<>();
 			skipWhitespace();
 			while (peek() != ']') {
+				int before = pos;
 				values.add(value());
 				skipWhitespace();
 				if (peek() == ',') pos++;
 				skipWhitespace();
+				if (pos == before) throw error("Stuck");
 			}
 			expect(']');
 			return switch (type) {
@@ -82,12 +86,14 @@ public final class Snbt {
 		}
 		List<Object> values = new ArrayList<>();
 		while (peek() != ']') {
+			int before = pos;
 			skipWhitespace();
 			skipIndexPrefix();
 			values.add(value());
 			skipWhitespace();
 			if (peek() == ',') pos++;
 			skipWhitespace();
+			if (pos == before) throw error("Stuck");
 		}
 		expect(']');
 		return values;

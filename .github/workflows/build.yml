@@ -67,11 +67,20 @@ jobs:
         run: |
           mkdir -p fabric/run
           echo "eula=true" > fabric/run/eula.txt
-          export LIBGL_ALWAYS_SOFTWARE=1 SDL_VIDEODRIVER=x11
-          (timeout 300 xvfb-run -a -s "-screen 0 1280x720x24 +extension GLX +render -noreset" ./gradlew :fabric:runClient -Pmc=${{ matrix.mc }} \
+          export LIBGL_ALWAYS_SOFTWARE=1 SDL_VIDEODRIVER=x11 SKYBLOCKPV_SELFTEST=1
+          (timeout 900 xvfb-run -a -s "-screen 0 1280x720x24 +extension GLX +render -noreset" ./gradlew :fabric:runClient -Pmc=${{ matrix.mc }} \
             -Dmixin.debug.verify=true > client.log 2>&1 || true)
           if grep -qE "Mixin apply.*failed|InvalidInjectionException|InvalidMixinException|Game crashed|Could not execute entrypoint|Incompatible mods" client.log; then
             grep -E -A6 "Mixin apply.*failed|InvalidInjection|InvalidMixin|Game crashed|Could not execute entrypoint|Incompatible mods|Caused by" client.log | head -60 | awk '{printf "%s%%0A", $0}' | sed 's/^/::error title=launch ${{ matrix.mc }}::/'
+            echo
+            exit 1
+          fi
+          # The self-test opens /pv with sample data, every tab, the item browser and the settings.
+          grep -E "SKYBLOCKPV SELFTEST" client.log | head -20 | sed 's/^/::notice title=selftest ${{ matrix.mc }}::/'
+          if ! grep -q "SKYBLOCKPV SELFTEST PASSED" client.log; then
+            grep -E -A25 "SELFTEST (STALL|FAILED)|Exception|Error" client.log | head -80 | awk '{printf "%s%%0A", $0}' | sed 's/^/::error title=selftest ${{ matrix.mc }}::/'
+            echo
+            tail -30 client.log | awk '{printf "%s%%0A", $0}' | sed 's/^/::error title=selftest tail ${{ matrix.mc }}::/'
             echo
             exit 1
           fi

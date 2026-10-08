@@ -61,6 +61,17 @@ public class PvScreen extends Screen {
 	private static final int KEY_KP_ENTER = 335;
 	private static final String[] ROMAN = {"0", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"};
 
+	/** Switches tab and page, as clicking would. Used by the launch self-test. */
+	public void showTab(int index, int newPage) {
+		tab = Tab.values()[Math.floorMod(index, Tab.values().length)];
+		page = Math.floorMod(newPage, pageCount());
+		rebuildWidgets();
+	}
+
+	public boolean loaded() {
+		return profile != null || error != null;
+	}
+
 	/** Tab labels in order, for the settings screen's "default tab" option. */
 	public static List<String> tabLabels() {
 		return java.util.Arrays.stream(Tab.values()).map(t -> t.label).toList();
@@ -107,25 +118,29 @@ public class PvScreen extends Screen {
 	/** Left edge of the whole window: the sidebar if shown, else the panel. */
 	private int frameLeft;
 	private boolean showSidebar;
-	private PlayerPreview preview;
 	private List<io.github.streetinman.skyblockpv.core.model.Pet> sortedPets = List.of();
 	private ItemStack hoveredStack;
+	private final List<net.minecraft.client.gui.components.AbstractWidget> panelWidgets = new ArrayList<>();
 	private List<Component> hoveredText;
 
 	public PvScreen(String playerName, ProfileService service, PvConfig config) {
+		this(playerName, service, config, service.lookup(playerName));
+	}
+
+	/** Shows an already-started (or finished) lookup; the launch self-test uses this with sample data. */
+	public PvScreen(String playerName, ProfileService service, PvConfig config, java.util.concurrent.CompletableFuture<ProfileService.Lookup> pending) {
 		super(Component.literal("Profile Viewer: " + playerName));
 		this.requestedName = playerName;
 		this.service = service;
 		this.config = config;
 		this.tab = java.util.Arrays.stream(Tab.values()).filter(t -> t.label.equalsIgnoreCase(config.gui.defaultTab)).findFirst().orElse(Tab.OVERVIEW);
-		service.lookup(playerName).whenCompleteAsync((result, failure) -> {
+		pending.whenCompleteAsync((result, failure) -> {
 			if (failure != null) {
 				error = SkyblockPvClient.rootMessage(failure);
 				SkyblockPvClient.LOGGER.warn("Lookup for {} failed", playerName, failure);
 			} else {
 				lookup = result;
 				selectProfile(result.selected());
-				preview = PlayerPreview.create(result.player().uuid(), result.player().name());
 			}
 			rebuildWidgets();
 		}, Minecraft.getInstance());
@@ -157,7 +172,6 @@ public class PvScreen extends Screen {
 				.thenComparing(java.util.Comparator.comparingInt(io.github.streetinman.skyblockpv.core.model.Pet::tierIndex).reversed())
 				.thenComparing(java.util.Comparator.comparingDouble((io.github.streetinman.skyblockpv.core.model.Pet pet) -> io.github.streetinman.skyblockpv.core.model.PetLevels.level(pet)).reversed()))
 				.toList();
-		if (preview != null) preview.wear(m.inventories().armor(), stacks::get);
 		networth = prices == null ? null : NetworthCalculator.calculate(m, p.bankBalance(), prices);
 	}
 
@@ -182,6 +196,7 @@ public class PvScreen extends Screen {
 		left = frameLeft + (showSidebar ? SIDEBAR_WIDTH + SIDEBAR_GAP : 0);
 		top = (height - PANEL_HEIGHT) / 2 + 10;
 
+		panelWidgets.clear();
 		// Tabs share the whole window width: each gets its label width plus an equal share of what's left.
 		int gap = 2;
 		int natural = 0;
@@ -207,12 +222,12 @@ public class PvScreen extends Screen {
 		searchBox.setHint(Component.literal("§7Search player…"));
 		searchBox.setValue(searchText);
 		searchBox.setResponder(text -> searchText = text);
-		addRenderableWidget(searchBox);
-		addRenderableWidget(Button.builder(Component.literal("Go"), b -> search())
+		panelWidget(searchBox);
+		panelWidget(Button.builder(Component.literal("Go"), b -> search())
 				.bounds(left + PANEL_WIDTH - 98, top + 4, 24, 16).build());
 
 		if (lookup != null && lookup.profiles().size() > 1) {
-			addRenderableWidget(Button.builder(Component.literal("Profile ▸"), b -> {
+			panelWidget(Button.builder(Component.literal("Profile ▸"), b -> {
 				int i = lookup.profiles().indexOf(profile);
 				selectProfile(lookup.profiles().get((i + 1) % lookup.profiles().size()));
 				rebuildWidgets();
@@ -221,11 +236,11 @@ public class PvScreen extends Screen {
 
 		int pages = pageCount();
 		if (pages > 1) {
-			addRenderableWidget(Button.builder(Component.literal("<"), b -> {
+			panelWidget(Button.builder(Component.literal("<"), b -> {
 				page = (page + pages - 1) % pages;
 				rebuildWidgets();
 			}).bounds(left + PANEL_WIDTH - 50, top + PANEL_HEIGHT - 20, 20, 16).build());
-			addRenderableWidget(Button.builder(Component.literal(">"), b -> {
+			panelWidget(Button.builder(Component.literal(">"), b -> {
 				page = (page + 1) % pages;
 				rebuildWidgets();
 			}).bounds(left + PANEL_WIDTH - 26, top + PANEL_HEIGHT - 20, 20, 16).build());
@@ -257,6 +272,7 @@ public class PvScreen extends Screen {
 		frame(g, left, top, PANEL_WIDTH, PANEL_HEIGHT);
 		if (showSidebar) drawSidebar(g, mouseX, mouseY);
 		g.text(font, lookup != null ? lookup.player().name() : requestedName, left + 6, top + 6, WHITE, true);
+		for (var widget : panelWidgets) widget.extractRenderState(g, mouseX, mouseY, delta);
 
 		if (error != null) {
 			g.centeredText(font, "§c" + error, left + PANEL_WIDTH / 2, top + PANEL_HEIGHT / 2, WHITE);
@@ -629,21 +645,13 @@ public class PvScreen extends Screen {
 		g.fill(x, y, x + w, y + 1, ACCENT);
 	}
 
-	/** The player's model, which turns to follow the mouse, with a few headline numbers under it. */
+	/** Headline numbers beside the main panel. */
 	private void drawSidebar(GuiGraphicsExtractor g, int mouseX, int mouseY) {
 		int x = frameLeft;
 		frame(g, x, top, SIDEBAR_WIDTH, PANEL_HEIGHT);
-		int modelBottom = top + 130;
-		if (preview != null && preview.entity() != null) {
-			net.minecraft.client.gui.screens.inventory.InventoryScreen.extractEntityInInventoryFollowsMouse(
-					g, x + 4, top + 6, x + SIDEBAR_WIDTH - 4, modelBottom, 52, 0.0625f, mouseX, mouseY, preview.entity());
-		} else {
-			g.centeredText(font, "§8" + (Minecraft.getInstance().level == null ? "Join a world" : "Loading skin…"), x + SIDEBAR_WIDTH / 2, top + 60, WHITE);
-			g.centeredText(font, "§8to see the model", x + SIDEBAR_WIDTH / 2, top + 71, WHITE);
-		}
 		if (profile == null) return;
 		MemberData m = profile.member();
-		int y = modelBottom + 6;
+		int y = top + 8;
 		List<String> lines = new ArrayList<>();
 		lines.add("§bLvl " + (int) m.skyblockLevel());
 		lines.add("§6" + (networth != null ? compact((long) networth.total()) : "…") + " §7NW");
@@ -772,6 +780,12 @@ public class PvScreen extends Screen {
 			shortened = shortened.substring(0, shortened.length() - 1);
 		}
 		return shortened + "…";
+	}
+
+	/** Widgets inside the panel are drawn after it, so the panel background doesn't cover them. */
+	private <T extends net.minecraft.client.gui.components.AbstractWidget> T panelWidget(T widget) {
+		panelWidgets.add(widget);
+		return addWidget(widget);
 	}
 
 	private int pageCount() {
