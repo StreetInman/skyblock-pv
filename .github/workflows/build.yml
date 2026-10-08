@@ -61,12 +61,13 @@ jobs:
           distribution: temurin
           java-version: 25
       - uses: gradle/actions/setup-gradle@v4
-      - run: sudo apt-get update -qq && sudo apt-get install -y -qq xvfb mesa-utils libgl1-mesa-dri > /dev/null
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq xvfb mesa-utils libgl1-mesa-dri libglx-mesa0 libegl1 > /dev/null
       - name: Launch the client
         run: |
           mkdir -p fabric/run
           echo "eula=true" > fabric/run/eula.txt
-          (timeout 300 xvfb-run -a -s "-screen 0 1280x720x24" ./gradlew :fabric:runClient -Pmc=${{ matrix.mc }} \
+          export LIBGL_ALWAYS_SOFTWARE=1 SDL_VIDEODRIVER=x11
+          (timeout 300 xvfb-run -a -s "-screen 0 1280x720x24 +extension GLX +render -noreset" ./gradlew :fabric:runClient -Pmc=${{ matrix.mc }} \
             -Dmixin.debug.verify=true > client.log 2>&1 || true)
           if grep -qE "Mixin apply.*failed|InvalidInjectionException|InvalidMixinException|Game crashed|Could not execute entrypoint|Incompatible mods" client.log; then
             grep -E -A6 "Mixin apply.*failed|InvalidInjection|InvalidMixin|Game crashed|Could not execute entrypoint|Incompatible mods|Caused by" client.log | head -60 | awk '{printf "%s%%0A", $0}' | sed 's/^/::error title=launch ${{ matrix.mc }}::/'
