@@ -37,6 +37,7 @@ final class SelfTest {
 	private static int step;
 	private static int waitStart;
 	private static CompletableFuture<ProfileService.Lookup> sample;
+	private static volatile net.minecraft.client.gui.screens.Screen screen;
 
 	private SelfTest() {
 	}
@@ -60,6 +61,8 @@ final class SelfTest {
 		}, "skyblockpv-selftest-watchdog");
 		watchdog.setDaemon(true);
 		watchdog.start();
+		// The current screen moved between versions, so track it from the screen events instead.
+		net.fabricmc.fabric.api.client.screen.v1.ScreenEvents.AFTER_INIT.register((client, opened, w, h) -> screen = opened);
 		ClientTickEvents.END_CLIENT_TICK.register(SelfTest::tick);
 	}
 
@@ -77,7 +80,7 @@ final class SelfTest {
 	private static void run(Minecraft mc) {
 		switch (phase) {
 			case 0 -> {
-				if (mc.screen instanceof TitleScreen) {
+				if (screen instanceof TitleScreen) {
 					sample = sampleLookup();
 					next("opening /pv");
 				}
@@ -87,13 +90,13 @@ final class SelfTest {
 				next("waiting for /pv data");
 			}
 			case 2 -> {
-				if (mc.screen instanceof PvScreen pv && pv.loaded()) next("clicking through /pv tabs");
+				if (screen instanceof PvScreen pv && pv.loaded()) next("clicking through /pv tabs");
 				else if (tick - waitStart > 1200) throw new IllegalStateException("/pv never loaded");
 			}
 			case 3 -> {
 				// 9 tabs × 3 pages each, one every STEP_TICKS.
 				if (tick % STEP_TICKS != 0) return;
-				if (!(mc.screen instanceof PvScreen pv)) throw new IllegalStateException("/pv closed: " + mc.screen);
+				if (!(screen instanceof PvScreen pv)) throw new IllegalStateException("/pv closed: " + screen);
 				int tabs = PvScreen.tabLabels().size();
 				if (step >= tabs * 3) {
 					next("opening item browser");
@@ -108,7 +111,7 @@ final class SelfTest {
 				next("waiting for item data");
 			}
 			case 5 -> {
-				if (mc.screen instanceof ItemBrowserScreen items && items.loaded()) {
+				if (screen instanceof ItemBrowserScreen items && items.loaded()) {
 					SkyblockPvClient.LOGGER.info("SKYBLOCKPV SELFTEST item browser: {}", items.status() == null ? "loaded" : items.status());
 					items.selectShown(0);
 					next("item browser showing a recipe");
@@ -128,7 +131,7 @@ final class SelfTest {
 			}
 			case 8 -> {
 				if (tick % STEP_TICKS != 0) return;
-				if (!(mc.screen instanceof SettingsScreen settings)) throw new IllegalStateException("settings closed");
+				if (!(screen instanceof SettingsScreen settings)) throw new IllegalStateException("settings closed");
 				if (step >= SettingsScreen.categoryCount()) {
 					next("done");
 					return;
