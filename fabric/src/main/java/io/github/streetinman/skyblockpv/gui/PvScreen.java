@@ -42,6 +42,13 @@ import io.github.streetinman.skyblockpv.item.ItemStacks;
  */
 public class PvScreen extends Screen {
 	private static final int PANEL_WIDTH = 370;
+	/** Player model column to the left of the panel; dropped when the window is too narrow. */
+	private static final int SIDEBAR_WIDTH = 86;
+	private static final int SIDEBAR_GAP = 4;
+	private static final int BORDER = 0xFF3A3A5C;
+	private static final int ACCENT = 0xFF6C6CFF;
+	private static final int BACKGROUND = 0xE0101018;
+	private static final int PETS_PER_PAGE = 28;
 	private static final int PANEL_HEIGHT = 220;
 	private static final int SLOT = 18;
 	private static final int WHITE = 0xFFFFFFFF;
@@ -54,9 +61,14 @@ public class PvScreen extends Screen {
 	private static final int KEY_KP_ENTER = 335;
 	private static final String[] ROMAN = {"0", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"};
 
+	/** Tab labels in order, for the settings screen's "default tab" option. */
+	public static List<String> tabLabels() {
+		return java.util.Arrays.stream(Tab.values()).map(t -> t.label).toList();
+	}
+
 	private enum Tab {
 		OVERVIEW("Stats"), SKILLS("Skills"), DUNGEONS("Dungeons"), INVENTORY("Inv"), STORAGE("Storage"),
-		ACCESSORIES("Accs"), TROPHY_FISH("Trophy");
+		ACCESSORIES("Accs"), PETS("Pets"), TROPHY_FISH("Trophy"), MISC("Misc");
 
 		final String label;
 
@@ -85,13 +97,18 @@ public class PvScreen extends Screen {
 	private Networth networth;
 	private String networthError;
 	private String error;
-	private Tab tab = Tab.OVERVIEW;
+	private Tab tab;
 	private int page;
 	private EditBox searchBox;
 	private String searchText = "";
 
 	private int left;
 	private int top;
+	/** Left edge of the whole window: the sidebar if shown, else the panel. */
+	private int frameLeft;
+	private boolean showSidebar;
+	private PlayerPreview preview;
+	private List<io.github.streetinman.skyblockpv.core.model.Pet> sortedPets = List.of();
 	private ItemStack hoveredStack;
 	private List<Component> hoveredText;
 
@@ -100,6 +117,7 @@ public class PvScreen extends Screen {
 		this.requestedName = playerName;
 		this.service = service;
 		this.config = config;
+		this.tab = java.util.Arrays.stream(Tab.values()).filter(t -> t.label.equalsIgnoreCase(config.gui.defaultTab)).findFirst().orElse(Tab.OVERVIEW);
 		service.lookup(playerName).whenCompleteAsync((result, failure) -> {
 			if (failure != null) {
 				error = SkyblockPvClient.rootMessage(failure);
@@ -107,6 +125,7 @@ public class PvScreen extends Screen {
 			} else {
 				lookup = result;
 				selectProfile(result.selected());
+				preview = PlayerPreview.create(result.player().uuid(), result.player().name());
 			}
 			rebuildWidgets();
 		}, Minecraft.getInstance());
@@ -133,6 +152,12 @@ public class PvScreen extends Screen {
 				DungeonCalculator.runsToCatacombs50(d.catacombsXp(), d.masterCompletions().getOrDefault(7, 0), DungeonCalculator.M7_BASE_XP, boosts),
 				DungeonCalculator.classAverage50(d.classXp(), DungeonCalculator.M7_BASE_XP, boosts));
 		storagePages = storagePages(m.inventories());
+		sortedPets = m.pets().stream().sorted(java.util.Comparator
+				.comparing(io.github.streetinman.skyblockpv.core.model.Pet::active).reversed()
+				.thenComparing(java.util.Comparator.comparingInt(io.github.streetinman.skyblockpv.core.model.Pet::tierIndex).reversed())
+				.thenComparing(java.util.Comparator.comparingDouble((io.github.streetinman.skyblockpv.core.model.Pet pet) -> io.github.streetinman.skyblockpv.core.model.PetLevels.level(pet)).reversed()))
+				.toList();
+		if (preview != null) preview.wear(m.inventories().armor(), stacks::get);
 		networth = prices == null ? null : NetworthCalculator.calculate(m, p.bankBalance(), prices);
 	}
 
@@ -151,18 +176,29 @@ public class PvScreen extends Screen {
 
 	@Override
 	protected void init() {
-		left = (width - PANEL_WIDTH) / 2;
+		showSidebar = config.gui.showPlayerModel && width >= PANEL_WIDTH + SIDEBAR_WIDTH + SIDEBAR_GAP + 10;
+		int frameWidth = PANEL_WIDTH + (showSidebar ? SIDEBAR_WIDTH + SIDEBAR_GAP : 0);
+		frameLeft = (width - frameWidth) / 2;
+		left = frameLeft + (showSidebar ? SIDEBAR_WIDTH + SIDEBAR_GAP : 0);
 		top = (height - PANEL_HEIGHT) / 2 + 10;
 
-		int x = left;
-		for (Tab t : Tab.values()) {
-			int w = font.width(t.label) + 10;
+		// Tabs share the whole window width: each gets its label width plus an equal share of what's left.
+		int gap = 2;
+		int natural = 0;
+		for (Tab t : Tab.values()) natural += font.width(t.label) + 6;
+		int spare = frameWidth - natural - gap * (Tab.values().length - 1);
+		int x = frameLeft;
+		for (int i = 0; i < Tab.values().length; i++) {
+			Tab t = Tab.values()[i];
+			int w = font.width(t.label) + 6 + spare / Tab.values().length;
+			// Give rounding leftovers to the last tab so the row ends exactly at the window edge.
+			if (i == Tab.values().length - 1) w = frameLeft + frameWidth - x;
 			addRenderableWidget(Button.builder(Component.literal(t.label), b -> {
 				tab = t;
 				page = 0;
 				rebuildWidgets();
 			}).bounds(x, top - 22, w, 20).build()).active = t != tab;
-			x += w + 2;
+			x += w + gap;
 		}
 
 		// Look up someone else without closing the window.
@@ -218,7 +254,8 @@ public class PvScreen extends Screen {
 		hoveredStack = null;
 		hoveredText = null;
 
-		g.fill(left, top, left + PANEL_WIDTH, top + PANEL_HEIGHT, 0xE0101018);
+		frame(g, left, top, PANEL_WIDTH, PANEL_HEIGHT);
+		if (showSidebar) drawSidebar(g, mouseX, mouseY);
 		g.text(font, lookup != null ? lookup.player().name() : requestedName, left + 6, top + 6, WHITE, true);
 
 		if (error != null) {
@@ -236,7 +273,9 @@ public class PvScreen extends Screen {
 				case INVENTORY -> drawInventory(g, contentTop, mouseX, mouseY);
 				case STORAGE -> drawStorage(g, contentTop, mouseX, mouseY);
 				case ACCESSORIES -> drawAccessories(g, contentTop, mouseX, mouseY);
+				case PETS -> drawPets(g, contentTop, mouseX, mouseY);
 				case TROPHY_FISH -> drawTrophyFish(g, contentTop);
+				case MISC -> drawMisc(g, contentTop);
 			}
 			if (pageCount() > 1) {
 				g.text(font, "Page " + (page + 1) + "/" + pageCount(), left + PANEL_WIDTH - 110, top + PANEL_HEIGHT - 16, GREY, false);
@@ -339,6 +378,10 @@ public class PvScreen extends Screen {
 
 	private void drawDungeons(GuiGraphicsExtractor g, int y, int mouseX, int mouseY) {
 		DungeonData d = profile.member().dungeons();
+		if (page == 1) {
+			drawFloors(g, y, d);
+			return;
+		}
 		int x = left + 8;
 
 		List<String> classLines = new ArrayList<>();
@@ -353,7 +396,7 @@ public class PvScreen extends Screen {
 
 		Long best = d.masterFastestSPlusMs().get(7);
 		List<String> stats = List.of(
-				"§7Secrets: §f" + String.format(Locale.ROOT, "%,d", d.secrets()),
+				"§7Secrets: §f" + String.format(Locale.ROOT, "%,d", d.secrets()) + " §8(" + decimal(d.secretsPerRun()) + "/run)",
 				"§7Runs: §f" + String.format(Locale.ROOT, "%,d", d.totalRuns())
 						+ " §7(M7: §f" + d.masterCompletions().getOrDefault(7, 0) + "§7)",
 				"§7Best M7 S+: §f" + (best == null ? "—" : time(best)));
@@ -579,6 +622,143 @@ public class PvScreen extends Screen {
 		}
 	}
 
+	/** Panel background with a thin border and an accent line under the header. */
+	private void frame(GuiGraphicsExtractor g, int x, int y, int w, int h) {
+		g.fill(x - 1, y - 1, x + w + 1, y + h + 1, BORDER);
+		g.fill(x, y, x + w, y + h, BACKGROUND);
+		g.fill(x, y, x + w, y + 1, ACCENT);
+	}
+
+	/** The player's model, which turns to follow the mouse, with a few headline numbers under it. */
+	private void drawSidebar(GuiGraphicsExtractor g, int mouseX, int mouseY) {
+		int x = frameLeft;
+		frame(g, x, top, SIDEBAR_WIDTH, PANEL_HEIGHT);
+		int modelBottom = top + 130;
+		if (preview != null && preview.entity() != null) {
+			net.minecraft.client.gui.screens.inventory.InventoryScreen.extractEntityInInventoryFollowsMouse(
+					g, x + 4, top + 6, x + SIDEBAR_WIDTH - 4, modelBottom, 52, 0.0625f, mouseX, mouseY, preview.entity());
+		} else {
+			g.centeredText(font, "§8" + (Minecraft.getInstance().level == null ? "Join a world" : "Loading skin…"), x + SIDEBAR_WIDTH / 2, top + 60, WHITE);
+			g.centeredText(font, "§8to see the model", x + SIDEBAR_WIDTH / 2, top + 71, WHITE);
+		}
+		if (profile == null) return;
+		MemberData m = profile.member();
+		int y = modelBottom + 6;
+		List<String> lines = new ArrayList<>();
+		lines.add("§bLvl " + (int) m.skyblockLevel());
+		lines.add("§6" + (networth != null ? compact((long) networth.total()) : "…") + " §7NW");
+		lines.add("§c" + decimal(m.dungeons().catacombsLevel()) + " §7Cata");
+		lines.add("§9" + String.format(Locale.ROOT, "%,d", m.power().magicalPower()) + " §7MP");
+		lines.add("§e" + decimal(skills().stream().mapToInt(SkillLevel::level).average().orElse(0)) + " §7SA");
+		for (String line : lines) {
+			g.centeredText(font, line, x + SIDEBAR_WIDTH / 2, y, WHITE);
+			y += 11;
+		}
+	}
+
+	private void drawFloors(GuiGraphicsExtractor g, int y, DungeonData d) {
+		int x = left + 8;
+		int[] cols = {0, 40, 90, 140, 190, 240};
+		String[] heads = {"§7Floor", "§7Runs", "§7PB", "§7PB S", "§7PB S+", "§7Score"};
+		g.text(font, "§7Secrets: §f" + String.format(Locale.ROOT, "%,d", d.secrets()) + " §7· §f" + decimal(d.secretsPerRun())
+				+ " §7per run · §f" + String.format(Locale.ROOT, "%,d", d.totalRuns()) + " §7runs", x, y, WHITE, false);
+		y += 13;
+		for (int i = 0; i < cols.length; i++) g.text(font, heads[i], x + cols[i], y, WHITE, false);
+		y += 11;
+		for (int f = 0; f <= 7; f++) y = floorRow(g, x, y, cols, f == 0 ? "§aEntrance" : "§aF" + f, d.normalFloors().get(f));
+		y += 3;
+		for (int f = 1; f <= 7; f++) y = floorRow(g, x, y, cols, "§cM" + f, d.masterFloors().get(f));
+	}
+
+	private int floorRow(GuiGraphicsExtractor g, int x, int y, int[] cols, String name, io.github.streetinman.skyblockpv.core.dungeons.FloorStats stats) {
+		var f = stats == null ? io.github.streetinman.skyblockpv.core.dungeons.FloorStats.NONE : stats;
+		String[] cells = {name, (f.completions() == 0 ? "§8" : "§f") + String.format(Locale.ROOT, "%,d", f.completions()),
+				pb(f.fastestMs()), pb(f.fastestSMs()), pb(f.fastestSPlusMs()), f.bestScore() == 0 ? "§8—" : "§f" + f.bestScore()};
+		for (int i = 0; i < cols.length; i++) g.text(font, cells[i], x + cols[i], y, WHITE, false);
+		return y + 10;
+	}
+
+	private static String pb(long ms) {
+		return ms <= 0 ? "§8—" : "§f" + time(ms);
+	}
+
+	private void drawPets(GuiGraphicsExtractor g, int y, int mouseX, int mouseY) {
+		if (sortedPets.isEmpty()) {
+			g.text(font, "§7No pets (or the API doesn't show them).", left + 8, y, WHITE, false);
+			return;
+		}
+		String[] colours = {"§f", "§a", "§9", "§5", "§6", "§d"};
+		int from = page * PETS_PER_PAGE;
+		int columnWidth = (PANEL_WIDTH - 16) / 2;
+		for (int i = from; i < Math.min(sortedPets.size(), from + PETS_PER_PAGE); i++) {
+			var pet = sortedPets.get(i);
+			int slot = i - from;
+			int x = left + 8 + (slot / (PETS_PER_PAGE / 2)) * columnWidth;
+			int rowY = y + (slot % (PETS_PER_PAGE / 2)) * 11;
+			int level = (int) io.github.streetinman.skyblockpv.core.model.PetLevels.level(pet);
+			String colour = pet.tierIndex() >= 0 ? colours[pet.tierIndex()] : "§f";
+			String line = "§7[" + level + "] " + colour + fit(titleCase(pet.type()), columnWidth - 50) + (pet.active() ? " §a●" : "")
+					+ (pet.heldItem() != null ? " §8✦" : "");
+			g.text(font, line, x, rowY, WHITE, false);
+			if (mouseX >= x && mouseX < x + columnWidth && mouseY >= rowY && mouseY < rowY + 10) {
+				List<Component> tip = new ArrayList<>();
+				tip.add(Component.literal(colour + titleCase(pet.type()) + " §7(" + titleCase(pet.tier()) + ")"));
+				tip.add(Component.literal("§7Level: §f" + decimal(io.github.streetinman.skyblockpv.core.model.PetLevels.level(pet))
+						+ " §8/ " + io.github.streetinman.skyblockpv.core.model.PetLevels.maxLevel(pet.type())));
+				tip.add(Component.literal("§7XP: §f" + String.format(Locale.ROOT, "%,.0f", pet.exp())));
+				if (pet.heldItem() != null) tip.add(Component.literal("§7Held item: §f" + titleCase(pet.heldItem().replace("PET_ITEM_", ""))));
+				if (pet.skin() != null) tip.add(Component.literal("§7Skin: §f" + titleCase(pet.skin())));
+				if (pet.active()) tip.add(Component.literal("§aActive pet"));
+				hoveredText = tip;
+			}
+		}
+	}
+
+	private void drawMisc(GuiGraphicsExtractor g, int y) {
+		var e = profile.member().extras();
+		List<String> general = new ArrayList<>();
+		general.add("§eGeneral");
+		general.add("§7Joined: §f" + (e.firstJoinMs() <= 0 ? "—" : java.time.format.DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ROOT)
+				.format(java.time.Instant.ofEpochMilli(e.firstJoinMs()).atZone(java.time.ZoneId.systemDefault()))));
+		general.add("§7Profile: §f" + (profile.gameMode() == null ? "Normal" : titleCase(profile.gameMode())) + " §8(" + e.coopMembers()
+				+ (e.coopMembers() == 1 ? " player)" : " players)"));
+		general.add("§7Fairy Souls: §f" + profile.member().fairySouls());
+		general.add("§7Kills: §f" + num(e.kills()));
+		general.add("§7Deaths: §f" + num(e.deaths()));
+		general.add("§7Highest Crit: §f" + num((long) e.highestCritDamage()));
+		general.add("§7Items Fished: §f" + num(e.itemsFished()));
+		general.add("§7Gifts: §f" + num(e.giftsGiven()) + " §7given, §f" + num(e.giftsReceived()) + " §7got");
+		general.add("§7Minions Crafted: §f" + e.craftedMinions());
+		general.add("§7Motes: §d" + num(e.motes()));
+		general.add("§7Pets: §f" + profile.member().pets().size());
+		general.add("§7Trophy Fish: §f" + profile.member().trophyFishing().totalCaught());
+		drawLines(g, general, left + 8, y);
+
+		List<String> other = new ArrayList<>();
+		other.add("§bMining");
+		other.add("§7HotM: §f" + e.hotmTier() + " §8(" + compact((long) e.hotmXp()) + " XP)");
+		other.add("§7Powder: §2" + compact(e.mithrilPowder()) + " §d" + compact(e.gemstonePowder()) + " §b" + compact(e.glacitePowder()));
+		other.add("§cCrimson Isle");
+		other.add("§7Faction: §f" + (e.crimsonFaction() == null ? "none" : titleCase(e.crimsonFaction()))
+				+ " §8(" + compact(e.mageReputation()) + " mage, " + compact(e.barbarianReputation()) + " barb)");
+		StringBuilder kuudra = new StringBuilder("§7Kuudra: §f" + e.kuudraTotal());
+		String[] tiers = {"none", "hot", "burning", "fiery", "infernal"};
+		String[] short_ = {"B", "H", "Bu", "F", "I"};
+		kuudra.append(" §8(");
+		for (int i = 0; i < tiers.length; i++) kuudra.append(i == 0 ? "" : " ").append(short_[i]).append(e.kuudraCompletions().getOrDefault(tiers[i], 0));
+		other.add(kuudra.append(")").toString());
+		other.add("§aFarming");
+		other.add("§7Medals: §6" + e.jacobMedals().getOrDefault("gold", 0) + " §f" + e.jacobMedals().getOrDefault("silver", 0)
+				+ " §c" + e.jacobMedals().getOrDefault("bronze", 0));
+		other.add("§7Contests: §f" + e.jacobContests() + " §7Farming cap: §f+" + e.jacobFarmingLevelCap());
+		other.add("§7Double Drops: §f" + e.jacobDoubleDrops() + "/15");
+		drawLines(g, other, left + 190, y);
+	}
+
+	private static String num(long value) {
+		return String.format(Locale.ROOT, "%,d", value);
+	}
+
 	/** Width of the widest line, ignoring § colour codes (Font.width already skips them). */
 	private int widest(List<String> lines) {
 		return lines.stream().mapToInt(font::width).max().orElse(0);
@@ -599,6 +779,8 @@ public class PvScreen extends Screen {
 		Inventories inv = profile.member().inventories();
 		return switch (tab) {
 			case STORAGE -> Math.max(1, storagePages.size());
+			case DUNGEONS -> 2;
+			case PETS -> Math.max(1, (sortedPets.size() + PETS_PER_PAGE - 1) / PETS_PER_PAGE);
 			case ACCESSORIES -> inv.accessoryBag() == null ? 1
 					: Math.max(1, (inv.accessoryBag().size() + ACCESSORIES_PER_PAGE - 1) / ACCESSORIES_PER_PAGE);
 			default -> 1;

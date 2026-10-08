@@ -23,6 +23,8 @@ public final class PvConfig {
 	public String apiBaseUrl = HypixelClient.HYPIXEL_BASE_URL;
 	/** Lowest BIN prices for networth, as a flat {"ITEM_ID": price} JSON object (NEU format). */
 	public String lowestBinUrl = "https://sky.coflnet.com/api/prices/neu";
+	/** Item and recipe data for /sbitems: the NotEnoughUpdates repository (re-downloaded every 3 days). */
+	public String itemRepoUrl = "https://github.com/NotEnoughUpdates/NotEnoughUpdates-REPO/archive/refs/heads/master.zip";
 
 	// Dungeon calculator. Perks, Hecatomb, Scarf, Expert Ring, shard attributes and Derpy are read
 	// from the profile automatically; these cover what the API can't see or gets wrong.
@@ -37,10 +39,19 @@ public final class PvConfig {
 	/** Share of a run's class XP that the classes you didn't play receive. */
 	public double dungeonTeamShare = io.github.streetinman.skyblockpv.core.dungeons.XpBoosts.DEFAULT_TEAM_SHARE;
 
+	/** How the /pv window looks. */
+	public Gui gui = new Gui();
 	/** Client-side look of player models. Only changes what you see; nothing is sent to the server. */
 	public PlayerModel playerModel = new PlayerModel();
 	/** Client-side first-person item position, size and swing animation. */
 	public ItemAnimations itemAnimations = new ItemAnimations();
+
+	public static final class Gui {
+		/** Show the viewed player's model next to the /pv window. */
+		public boolean showPlayerModel = true;
+		/** Tab /pv opens on, by its label (e.g. "Stats", "Dungeons"). */
+		public String defaultTab = "Stats";
+	}
 
 	public static final class PlayerModel {
 		/** Size of your own player model, 1 = normal. */

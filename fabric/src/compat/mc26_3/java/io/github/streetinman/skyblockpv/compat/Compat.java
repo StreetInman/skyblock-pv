@@ -16,6 +16,12 @@ public final class Compat {
 		Minecraft.getInstance().gui.setScreen(screen);
 	}
 
+	/** The player's profile with skin textures, looked up through Mojang's session server. */
+	public static com.mojang.authlib.GameProfile fetchProfile(java.util.UUID uuid) {
+		var result = Minecraft.getInstance().services().sessionService().fetchProfile(uuid, false);
+		return result == null ? null : result.profile();
+	}
+
 	/** Vanilla registries for decoding items when not connected to a server, or null if unavailable. */
 	public static HolderLookup.Provider vanillaRegistries() {
 		// VanillaRegistries.createLookup() is gone in 26.3; items only decode while connected.

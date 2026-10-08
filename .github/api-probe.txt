@@ -1,5 +1,0 @@
-# One probe per line: <class> <grep -E pattern>, or `find <pattern>` to list matching class files.
-# CI prints the matching `javap -p` lines as notices, so Minecraft API differences between versions
-# can be checked without a local game jar. Notices are cut off around 4 KB, so keep patterns narrow.
-com.mojang.authlib.minecraft.SessionService public
-net.minecraft.server.players.ProfileResolver public

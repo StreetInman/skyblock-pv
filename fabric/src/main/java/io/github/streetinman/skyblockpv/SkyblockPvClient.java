@@ -26,6 +26,7 @@ import io.github.streetinman.skyblockpv.core.api.MojangClient;
 import io.github.streetinman.skyblockpv.core.api.ProfileService;
 import io.github.streetinman.skyblockpv.core.networth.PriceClient;
 import io.github.streetinman.skyblockpv.gui.PvScreen;
+import io.github.streetinman.skyblockpv.gui.ItemBrowserScreen;
 import io.github.streetinman.skyblockpv.gui.SettingsScreen;
 
 /**
@@ -39,6 +40,7 @@ public final class SkyblockPvClient implements ClientModInitializer {
 	public static final Logger LOGGER = LoggerFactory.getLogger("skyblock-pv");
 
 	private static final String[] COMMAND_NAMES = {"pv", "spv", "sbpv"};
+	private static final String[] ITEM_COMMAND_NAMES = {"sbitems", "sbrecipe"};
 
 	private static PvConfig config;
 	private static Path configFile;
@@ -67,7 +69,13 @@ public final class SkyblockPvClient implements ClientModInitializer {
 				Minecraft mc = Minecraft.getInstance();
 				mc.schedule(() -> Compat.setScreen(new SettingsScreen(config, SkyblockPvClient::saveConfig)));
 				return 1;
-			}));
+			}).then(ClientCommands.literal("items").executes(ctx -> openItems(""))));
+			for (String name : ITEM_COMMAND_NAMES) {
+				dispatcher.register(ClientCommands.literal(name)
+						.executes(ctx -> openItems(""))
+						.then(ClientCommands.argument("search", StringArgumentType.greedyString())
+								.executes(ctx -> openItems(StringArgumentType.getString(ctx, "search")))));
+			}
 			dispatcher.register(ClientCommands.literal("pvdump")
 					.then(ClientCommands.argument("player", StringArgumentType.word())
 							.executes(SkyblockPvClient::dump)));
@@ -78,6 +86,11 @@ public final class SkyblockPvClient implements ClientModInitializer {
 		Minecraft mc = Minecraft.getInstance();
 		// Open next tick: the chat screen closes after the command runs and would replace ours.
 		mc.schedule(() -> Compat.setScreen(new PvScreen(player, profiles, config)));
+		return 1;
+	}
+
+	public static int openItems(String search) {
+		Minecraft.getInstance().schedule(() -> Compat.setScreen(new ItemBrowserScreen(null, search)));
 		return 1;
 	}
 
