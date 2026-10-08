@@ -15,10 +15,12 @@ import com.google.gson.JsonObject;
 
 import io.github.streetinman.skyblockpv.core.dungeons.DungeonClass;
 import io.github.streetinman.skyblockpv.core.dungeons.DungeonData;
+import io.github.streetinman.skyblockpv.core.dungeons.FloorStats;
 import io.github.streetinman.skyblockpv.core.model.AccessoryPower;
 import io.github.streetinman.skyblockpv.core.model.Inventories;
 import io.github.streetinman.skyblockpv.core.model.MemberData;
 import io.github.streetinman.skyblockpv.core.model.Pet;
+import io.github.streetinman.skyblockpv.core.model.ProfileExtras;
 import io.github.streetinman.skyblockpv.core.model.Profile;
 import io.github.streetinman.skyblockpv.core.model.SkyblockItem;
 import io.github.streetinman.skyblockpv.core.model.Slayer;
@@ -64,7 +66,7 @@ public final class ProfileParser {
 					str(profile, "game_mode"),
 					profile.has("selected") && profile.get("selected").getAsBoolean(),
 					banking != null && banking.has("balance") ? banking.get("balance").getAsDouble() : null,
-					parseMember(uuid, member)));
+					parseMember(uuid, member, members.size())));
 		}
 		return profiles;
 	}
@@ -76,6 +78,10 @@ public final class ProfileParser {
 	}
 
 	static MemberData parseMember(String uuid, JsonObject member) throws IOException {
+		return parseMember(uuid, member, 1);
+	}
+
+	static MemberData parseMember(String uuid, JsonObject member, int coopMembers) throws IOException {
 		Map<String, Double> skillXp = new TreeMap<>();
 		JsonObject experience = path(member, "player_data", "experience");
 		if (experience != null) {
@@ -99,7 +105,66 @@ public final class ProfileParser {
 				parseAttributeStacks(path(member, "attributes", "stacks")),
 				parsePets(path(member, "pets_data")),
 				parseEssence(path(member, "currencies", "essence")),
-				parsePower(obj(member, "accessory_bag_storage")));
+				parsePower(obj(member, "accessory_bag_storage")),
+				parseExtras(member, coopMembers));
+	}
+
+	static ProfileExtras parseExtras(JsonObject member, int coopMembers) {
+		JsonObject stats = obj(member, "player_stats");
+		JsonObject mining = obj(member, "mining_core");
+		JsonObject nether = obj(member, "nether_island_player_data");
+		JsonObject jacob = obj(member, "jacobs_contest");
+		JsonObject playerData = obj(member, "player_data");
+		JsonElement generators = playerData == null ? null : playerData.get("crafted_generators");
+		return new ProfileExtras(
+				(long) num(obj(member, "profile"), "first_join"),
+				coopMembers,
+				(long) num(obj(stats, "deaths"), "total"),
+				(long) num(obj(stats, "kills"), "total"),
+				num(stats, "highest_critical_damage"),
+				(long) num(obj(stats, "items_fished"), "total"),
+				(long) num(obj(stats, "gifts"), "total_given"),
+				(long) num(obj(stats, "gifts"), "total_received"),
+				num(mining, "experience"),
+				(long) (num(mining, "powder_mithril") + num(mining, "powder_spent_mithril")),
+				(long) (num(mining, "powder_gemstone") + num(mining, "powder_spent_gemstone")),
+				(long) (num(mining, "powder_glacite") + num(mining, "powder_spent_glacite")),
+				intMap(obj(nether, "kuudra_completed_tiers")),
+				nether == null ? null : str(nether, "selected_faction"),
+				(long) num(nether, "mages_reputation"),
+				(long) num(nether, "barbarians_reputation"),
+				intMap(obj(jacob, "medals_inv")),
+				(int) num(obj(jacob, "perks"), "double_drops"),
+				(int) num(obj(jacob, "perks"), "farming_level_cap"),
+				obj(jacob, "contests") == null ? 0 : obj(jacob, "contests").size(),
+				(long) num(obj(member, "currencies"), "motes_purse"),
+				generators != null && generators.isJsonArray() ? generators.getAsJsonArray().size() : 0);
+	}
+
+	private static Map<String, Integer> intMap(JsonObject o) {
+		Map<String, Integer> result = new java.util.LinkedHashMap<>();
+		if (o != null) {
+			for (Map.Entry<String, JsonElement> e : o.entrySet()) {
+				if (e.getValue().isJsonPrimitive() && e.getValue().getAsJsonPrimitive().isNumber()) result.put(e.getKey(), e.getValue().getAsInt());
+			}
+		}
+		return Collections.unmodifiableMap(result);
+	}
+
+	private static Map<Integer, FloorStats> floors(JsonObject type) {
+		Map<Integer, FloorStats> result = new TreeMap<>();
+		java.util.Set<Integer> floors = new java.util.TreeSet<>();
+		for (String key : new String[] {"tier_completions", "fastest_time", "fastest_time_s", "fastest_time_s_plus"}) {
+			JsonObject o = obj(type, key);
+			if (o != null) for (String k : o.keySet()) if (isFloor(k)) floors.add(Integer.parseInt(k));
+		}
+		for (int f : floors) {
+			String k = Integer.toString(f);
+			result.put(f, new FloorStats((int) num(obj(type, "tier_completions"), k), (long) num(obj(type, "fastest_time"), k),
+					(long) num(obj(type, "fastest_time_s"), k), (long) num(obj(type, "fastest_time_s_plus"), k),
+					(int) num(obj(type, "best_score"), k)));
+		}
+		return Collections.unmodifiableMap(result);
 	}
 
 	static AccessoryPower parsePower(JsonObject storage) {
@@ -191,6 +256,8 @@ public final class ProfileParser {
 				completions(obj(cata, "tier_completions")),
 				completions(obj(master, "tier_completions")),
 				Collections.unmodifiableMap(fastest),
+				floors(cata),
+				floors(master),
 				Collections.unmodifiableMap(perks));
 	}
 

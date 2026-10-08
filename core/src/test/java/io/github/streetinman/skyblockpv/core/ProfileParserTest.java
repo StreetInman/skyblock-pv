@@ -45,6 +45,14 @@ class ProfileParserTest {
 		assertEquals("silky", m.power().selectedPower());
 		assertEquals(Map.of("strength", 30, "critical_damage", 12), m.power().tuning());
 		assertEquals(2, m.power().unlockedPowers());
+		var m7 = m.dungeons().masterFloors().get(7);
+		assertEquals(new io.github.streetinman.skyblockpv.core.dungeons.FloorStats(120, 290_000, 300_000, 312_000, 317), m7);
+		assertEquals(40, m.dungeons().normalFloors().get(7).completions());
+		assertEquals(12345.0 / (3 + 40 + 120), m.dungeons().secretsPerRun(), 1e-9);
+		assertEquals(4, m.extras().hotmTier());
+		assertEquals(15, m.extras().kuudraTotal());
+		assertEquals("mages", m.extras().crimsonFaction());
+		assertEquals(2, m.extras().coopMembers());
 	}
 
 	@Test
@@ -149,6 +157,7 @@ class ProfileParserTest {
 		p.addProperty("selected", selected);
 		JsonObject members = new JsonObject();
 		members.add(UUID, member);
+		members.add("coopmate", new JsonObject());
 		p.add("members", members);
 		return p;
 	}
@@ -178,7 +187,8 @@ class ProfileParserTest {
 				 "dungeon_types": {
 				   "catacombs": {"experience": 1.0e8, "tier_completions": {"0": 3, "7": 40, "total": 43}},
 				   "master_catacombs": {"experience": 0, "tier_completions": {"7": 120},
-				     "fastest_time_s_plus": {"7": 312000, "best": 312000}}},
+				     "fastest_time": {"7": 290000}, "fastest_time_s": {"7": 300000},
+				     "fastest_time_s_plus": {"7": 312000, "best": 312000}, "best_score": {"7": 317}}},
 				 "player_classes": {"mage": {"experience": 2.0e8}, "tank": {"experience": 5.0e7}}}
 				""").getAsJsonObject());
 		JsonObject perks = new JsonObject();
@@ -187,6 +197,9 @@ class ProfileParserTest {
 		JsonObject slayer = com.google.gson.JsonParser.parseString(
 				"{\"slayer_bosses\": {\"zombie\": {\"xp\": 1500000}, \"wolf\": {\"xp\": 2000}}}").getAsJsonObject();
 		m.add("slayer", slayer);
+		m.add("mining_core", com.google.gson.JsonParser.parseString("{\"experience\": 50000, \"powder_mithril\": 10}").getAsJsonObject());
+		m.add("nether_island_player_data", com.google.gson.JsonParser.parseString(
+				"{\"selected_faction\": \"mages\", \"kuudra_completed_tiers\": {\"none\": 5, \"infernal\": 10}}").getAsJsonObject());
 		m.add("accessory_bag_storage", com.google.gson.JsonParser.parseString("""
 				{"highest_magical_power": 1234, "selected_power": "silky", "unlocked_powers": ["silky", "bloody"],
 				 "tuning": {"slot_0": {"strength": 30, "critical_damage": 12, "health": 0}}}

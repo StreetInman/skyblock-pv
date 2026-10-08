@@ -1,11 +1,9 @@
 # One probe per line: <class> <grep -E pattern>, or `find <pattern>` to list matching class files.
 # CI prints the matching `javap -p` lines as notices, so Minecraft API differences between versions
 # can be checked without a local game jar. Notices are cut off around 4 KB, so keep patterns narrow.
-net.minecraft.client.gui.screens.inventory.InventoryScreen static.*Entity
-net.minecraft.client.gui.components.PlayerSkinWidget PlayerSkinWidget\(
-net.minecraft.client.resources.SkinManager public
-net.minecraft.client.player.RemotePlayer RemotePlayer\(
-net.minecraft.client.Minecraft services|SkinManager|getSkin|profile|Profile
-com.mojang.authlib.GameProfile public
-net.minecraft.client.gui.screens.Screen mouseClicked|mouseScrolled|charTyped
-net.minecraft.client.input.MouseButtonEvent public
+net.minecraft.client.player.AbstractClientPlayer Skin|class
+net.minecraft.server.Services public
+com.mojang.authlib.minecraft.MinecraftSessionService fetchProfile|class
+net.minecraft.client.gui.components.events.ContainerEventHandler mouseClicked|mouseScrolled
+net.minecraft.client.gui.components.events.GuiEventListener mouseClicked|mouseScrolled
+net.minecraft.world.entity.LivingEntity void setItemSlot

@@ -141,7 +141,7 @@ class DungeonCalculatorTest {
 		var inventory = ItemDecoder.decodeInventory(TestNbt.inventory(Arrays.asList(
 				TestNbt.enchanted(267, "HYPERION", "hecatomb", 7))));
 		Inventories inv = new Inventories(inventory, List.of(), List.of(), List.of(), null, bag, Map.of(), null, Map.of(), Map.of(), Set.of());
-		DungeonData dungeons = new DungeonData(0, Map.of(), null, 0, Map.of(), Map.of(), Map.of(),
+		DungeonData dungeons = new DungeonData(0, Map.of(), null, 0, Map.of(), Map.of(), Map.of(), Map.of(), Map.of(),
 				Map.of("toxophilite", 3, "cold_efficiency", 5));
 
 		XpBoosts b = XpBoosts.detect(dungeons, inv, Map.of("shard_scarf", 20, "SHARD_BONZO", 3), "Derpy",

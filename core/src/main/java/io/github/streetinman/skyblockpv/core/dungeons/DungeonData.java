@@ -8,6 +8,8 @@ import java.util.Map;
  * @param masterCompletions    floor number → Master Mode completions
  * @param floorCompletions     floor number (0 = Entrance) → normal completions
  * @param masterFastestSPlusMs floor number → fastest S+ time in milliseconds
+ * @param normalFloors         floor number (0 = Entrance) → completions and best times
+ * @param masterFloors         Master Mode floor number → completions and best times
  * @param perks                essence-shop perks ({@code player_data.perks}), e.g. {@code toxophilite → 5}
  */
 public record DungeonData(
@@ -18,7 +20,15 @@ public record DungeonData(
 		Map<Integer, Integer> floorCompletions,
 		Map<Integer, Integer> masterCompletions,
 		Map<Integer, Long> masterFastestSPlusMs,
+		Map<Integer, FloorStats> normalFloors,
+		Map<Integer, FloorStats> masterFloors,
 		Map<String, Integer> perks) {
+
+	/** Secrets found per completed run, the usual "secrets per run" average. */
+	public double secretsPerRun() {
+		int runs = totalRuns();
+		return runs == 0 ? 0 : (double) secrets / runs;
+	}
 
 	public double catacombsLevel() {
 		return DungeonLevels.level(catacombsXp);

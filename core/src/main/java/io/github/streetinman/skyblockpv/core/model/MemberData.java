@@ -13,6 +13,7 @@ import io.github.streetinman.skyblockpv.core.dungeons.DungeonData;
  * @param pets            every pet in the pet menu
  * @param essence         essence type (e.g. {@code WITHER}) → amount
  * @param power           magical power, selected power stone and tuning
+ * @param extras          smaller stats for the Misc tab
  */
 public record MemberData(
 		String uuid,
@@ -27,5 +28,6 @@ public record MemberData(
 		Map<String, Integer> attributeStacks,
 		java.util.List<Pet> pets,
 		Map<String, Long> essence,
-		AccessoryPower power) {
+		AccessoryPower power,
+		ProfileExtras extras) {
 }
