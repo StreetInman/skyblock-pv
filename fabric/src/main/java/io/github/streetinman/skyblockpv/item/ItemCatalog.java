@@ -7,9 +7,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
 
 import io.github.streetinman.skyblockpv.SkyblockPvClient;
 import io.github.streetinman.skyblockpv.core.items.ItemRepository;
@@ -65,9 +63,7 @@ public final class ItemCatalog {
 
 	/** An icon for an ID the repository doesn't have, such as a removed item. */
 	public static ItemStack missing(String id) {
-		ItemStack barrier = new ItemStack(Items.BARRIER);
-		barrier.set(DataComponents.CUSTOM_NAME, LegacyText.parse("§c" + id));
-		return barrier;
+		return ItemStacks.placeholder("§c" + id);
 	}
 
 	private static ItemStack build(RepoItem item) {
@@ -83,11 +79,9 @@ public final class ItemCatalog {
 			decoded = new SkyblockItem(decoded.legacyId(), 1, decoded.damage(), item.id(), item.name(),
 					item.lore().isEmpty() ? decoded.lore() : List.copyOf(item.lore()), decoded.uuid(), decoded.skullTexture(), decoded.nbt());
 			return ItemStacks.convert(decoded);
-		} catch (RuntimeException e) {
+		} catch (RuntimeException | LinkageError e) {
 			SkyblockPvClient.LOGGER.debug("Couldn't build icon for {}", item.id(), e);
-			ItemStack barrier = missing(item.id());
-			barrier.set(DataComponents.CUSTOM_NAME, LegacyText.parse(item.name()));
-			return barrier;
+			return ItemStacks.placeholder(item.name());
 		}
 	}
 }

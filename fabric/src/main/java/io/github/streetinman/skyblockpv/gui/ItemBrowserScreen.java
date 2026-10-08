@@ -173,6 +173,7 @@ public class ItemBrowserScreen extends Screen {
 			}
 		}
 		int gridBottom = gridY + ROWS * SLOT;
+		if (minecraft().level == null) g.text(font, "§8Icons show in a world", left + 6, top + PANEL_HEIGHT - 10, WHITE, false);
 		g.centeredText(font, "§7" + (page + 1) + " / " + pages() + "  §8(" + shown.size() + ")", left + 6 + COLUMNS * SLOT / 2, gridBottom + 8, WHITE);
 
 		drawDetail(g, detailX, mouseX, mouseY);

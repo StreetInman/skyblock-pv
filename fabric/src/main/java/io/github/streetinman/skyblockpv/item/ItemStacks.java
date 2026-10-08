@@ -64,9 +64,21 @@ public final class ItemStacks {
 			// LinkageError: a fixer built against a different Minecraft; show a placeholder, don't crash.
 			SkyblockPvClient.LOGGER.warn("Couldn't convert item {}", item.skyblockId(), e);
 		}
-		ItemStack barrier = new ItemStack(Items.BARRIER);
-		barrier.set(DataComponents.CUSTOM_NAME, LegacyText.parse(item.name() != null ? item.name() : "§c" + item.skyblockId()));
-		return barrier;
+		return placeholder(item.name() != null ? item.name() : "§c" + item.skyblockId());
+	}
+
+	/**
+	 * A named barrier, or EMPTY outside a world: from 26.2, item components aren't bound until the
+	 * client has joined a world, and creating any ItemStack before that throws.
+	 */
+	public static ItemStack placeholder(String legacyName) {
+		try {
+			ItemStack barrier = new ItemStack(Items.BARRIER);
+			barrier.set(DataComponents.CUSTOM_NAME, LegacyText.parse(legacyName));
+			return barrier;
+		} catch (NullPointerException e) {
+			return ItemStack.EMPTY;
+		}
 	}
 
 	private static ItemStack fix(CompoundTag nbt) {
