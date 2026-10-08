@@ -14,7 +14,7 @@
   "entrypoints": {
     "client": ["io.github.streetinman.skyblockpv.SkyblockPvClient"]
   },
-  "mixins": ["skyblockpv.mixins.json"],
+  "mixins": ["skyblockpv.mixins.json", "skyblockpv.compat.mixins.json"],
   "depends": {
     "fabricloader": ">=0.19.3",
     "fabric-api": "*",

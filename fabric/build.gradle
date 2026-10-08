@@ -23,6 +23,9 @@ sourceSets {
 		java {
 			srcDir "src/compat/${project.compat_dir}/java"
 		}
+		resources {
+			srcDir "src/compat/${project.compat_dir}/resources"
+		}
 	}
 }
 

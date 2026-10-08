@@ -1,7 +1,6 @@
 # One probe per line: <class> <grep -E pattern>, or `find <pattern>` to list matching class files.
 # CI prints the matching `javap -p` lines as notices, so Minecraft API differences between versions
-# can be checked without a local game jar.
-net.minecraft.client.renderer.FirstPersonHandsAndItemsRenderer .
-net.minecraft.client.renderer.state.level.FirstPersonHandsAndItemsRenderState .
-net.minecraft.client.player.FirstPersonHandsAndItems .
-com.mojang.blaze3d.vertex.PoseStack public
+# can be checked without a local game jar. Notices are cut off around 4 KB, so keep patterns narrow.
+net.minecraft.client.renderer.FirstPersonHandsAndItemsRenderer ^ *(private|public|protected) [^s].*\(
+net.minecraft.client.renderer.FirstPersonHandsAndItemsRenderer static .*\(
+net.minecraft.world.entity.LivingEntity SwingDuration|getSwingAnimation|getAttackAnim
