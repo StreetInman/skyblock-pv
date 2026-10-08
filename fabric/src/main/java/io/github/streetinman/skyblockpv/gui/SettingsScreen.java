@@ -81,7 +81,7 @@ public class SettingsScreen extends Screen {
 		switch (category) {
 			case GENERAL -> {
 				addRenderableWidget(Button.builder(Component.literal("Open item browser"), b -> io.github.streetinman.skyblockpv.compat.Compat.setScreen(
-						new ItemBrowserScreen(this))).bounds(col1, y, COLUMN, 20).build());
+						new ItemBrowserScreen(this, ""))).bounds(col1, y, COLUMN, 20).build());
 			}
 			case GUI -> {
 				PvConfig.Gui gui = config.gui;

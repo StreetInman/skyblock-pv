@@ -4,7 +4,7 @@ A client-side Fabric mod for Hypixel SkyBlock. Type `/pv <player>` to open a win
 that player's stats and gear, without leaving the game. Builds are available for Minecraft
 **26.1.2, 26.2 and 26.3**.
 
-> **Status: early development (v0.1.0).** It works with your own Hypixel developer key. A
+> **Status: early development (v0.3.0).** It works with your own Hypixel developer key. A
 > public release with no key setup needed is planned (see [Roadmap](#roadmap)).
 
 ## Features
@@ -13,11 +13,16 @@ that player's stats and gear, without leaving the game. Builds are available for
 |---|---|
 | Stats | SkyBlock level, **networth** (hover for a breakdown), magical power, selected power, tuning, active pet, purse, bank, fairy souls, skill average, Catacombs, class average, trophy fish rank, all slayer levels |
 | Skills | Every skill with level and progress to the next level |
-| Dungeons | Catacombs and class levels, secrets, runs, best M7 S+, and an **M7 calculator** (below) |
+| Dungeons | Catacombs and class levels, secrets and **secrets per run**, and an **M7 calculator** (below). Page 2 lists every floor, Entrance to F7 and M1 to M7, with runs, **PB, PB S, PB S+** and best score |
 | Inv | Armor, equipment (necklace, cloak, belt, gloves), inventory and hotbar |
 | Storage | Every ender chest page and backpack, one per page. Flip through with **<** and **>** |
 | Accs | Accessory bag |
+| Pets | Every pet with level (to 100, or 200 for Golden, Jade and Rose Dragon), held item and skin; the active pet is marked |
 | Trophy | All 18 trophy fish with bronze/silver/gold/diamond counts and your Trophy Hunter rank |
+| Misc | Profile age, co-op size, deaths, kills, highest crit, items fished, gifts, essences, HOTM tier and powders, Kuudra tiers, Crimson faction and reputation, Jacob's medals and contests, minions crafted, sacks and more |
+
+A model of the player, wearing their skin and armor, stands beside the window and follows your
+cursor, with a short summary under it. The tab row spans the full width of the window.
 
 Search for another player from the box at the top of the window. Items show with their real icons, including custom player-head textures. Hover any item to see its full name and lore. If a player has more than one profile, use
 **Profile ▸** to switch between them.
@@ -49,7 +54,13 @@ Hover the calculator to see exactly which boosts were found. Boosts the API can'
 
 ### Settings (`/skyblockpv`)
 
-`/skyblockpv` opens the mod's settings. Everything there is cosmetic and only changes what you see:
+`/skyblockpv` opens the mod's settings, split into tabs by area of the game: General, GUI, Player,
+Animations, Dungeons, Garden, Mining and Fishing. New tweaks land in the tab they belong to.
+Everything there is client-side and only changes what you see:
+
+- **GUI**: show or hide the player model in `/pv`, and pick which tab `/pv` opens on.
+- **Dungeons**: the M7 calculator's team share, global XP boost, extra class XP, and Graduate and
+  Explorer levels (Auto reads them from the profile).
 
 - **Player size**: shrink or enlarge your own player model (optionally everyone's). Hitboxes and
   movement are unchanged; only the drawn model is scaled.
@@ -100,7 +111,8 @@ As with any mod, Hypixel says all mods are used at your own risk.
 | `/pv` | Opens your own profile |
 | `/pv <player>` | Opens another player's profile |
 | `/spv`, `/sbpv` | Same as `/pv`, for when another mod has taken `/pv` |
-| `/skyblockpv` | Opens the settings (player size, item animations) |
+| `/skyblockpv` | Opens the settings |
+| `/sbitems [search]` (or `/sbrecipe`, `/skyblockpv items`) | Item browser: every SkyBlock item, a page at a time, with search, recipes and "used in" |
 | `/pvdump <player>` | Saves the raw API response to `config/skyblock-pv/dumps/` (for debugging) |
 
 ## Privacy
@@ -137,9 +149,8 @@ for releases, Modrinth and API keys.
 - [x] Dungeons tab with M7 calculator, slayers
 - [x] Storage tab (ender chest, backpacks)
 - [x] Networth, player search, builds for 26.1.2 / 26.2 / 26.3
-- [ ] Pets tab
+- [x] Pets tab, Misc tab, floor PBs, player model, tabbed settings, item and recipe browser
 - [ ] Loadouts tab (the API exposes them under `member.loadout`)
-- [ ] Player skin render on the overview
 - [ ] API proxy + production key so players don't need their own key
 - [ ] First release on Modrinth
 
@@ -149,6 +160,7 @@ for releases, Modrinth and API keys.
 - The dungeon XP model follows [adjectils](https://adjectils.com/dungeon.html), as ported in the
   MIT-licensed [rtca-bot-hypixel](https://github.com/BLACKUM/rtca-bot-hypixel).
 - Lowest BIN prices for networth come from [Coflnet](https://sky.coflnet.com).
+- Item and recipe data for `/sbitems` comes from the [NotEnoughUpdates repository](https://github.com/NotEnoughUpdates/NotEnoughUpdates-REPO), downloaded to `config/skyblock-pv/neu-repo.zip` and refreshed every 3 days.
 
 ## License
 
