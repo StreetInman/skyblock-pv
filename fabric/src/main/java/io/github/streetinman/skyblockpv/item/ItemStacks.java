@@ -60,7 +60,8 @@ public final class ItemStacks {
 						.withHidden(DataComponents.ENCHANTMENTS, true));
 				return stack;
 			}
-		} catch (RuntimeException e) {
+		} catch (RuntimeException | LinkageError e) {
+			// LinkageError: a fixer built against a different Minecraft; show a placeholder, don't crash.
 			SkyblockPvClient.LOGGER.warn("Couldn't convert item {}", item.skyblockId(), e);
 		}
 		ItemStack barrier = new ItemStack(Items.BARRIER);

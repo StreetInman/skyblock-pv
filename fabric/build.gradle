@@ -35,7 +35,9 @@ dependencies {
 	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
 
 	// Converts Hypixel's 1.8 item NBT into modern ItemStacks (Apache-2.0, by AzureAaron).
-	include implementation("net.azureaaron:legacy-item-dfu:${project.legacy_item_dfu_version}")
+	// Not transitive: its newer DataFixerUpper would replace Minecraft's own in dev runs (26.1.2's
+	// NbtOps doesn't implement the newer DFU methods). The released jar only bundles this jar anyway.
+	include implementation("net.azureaaron:legacy-item-dfu:${project.legacy_item_dfu_version}") { transitive = false }
 
 	// The Minecraft-free data layer, bundled into the mod jar.
 	include implementation(project(':core'))
