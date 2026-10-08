@@ -32,7 +32,7 @@ final class SelfTest {
 
 	private static volatile long lastTick = System.currentTimeMillis();
 	private static volatile String stage = "waiting for title screen";
-	private static int tick;
+	private static volatile int tick;
 	private static volatile int phase;
 	private static int step;
 	private static int waitStart;
@@ -51,7 +51,9 @@ final class SelfTest {
 				} catch (InterruptedException e) {
 					return;
 				}
-				if (phase > 0 && System.currentTimeMillis() - lastTick > 20_000) {
+				// Startup (before the first tick) gets 4 minutes under software rendering; after that 20 seconds a frame.
+				long limit = tick == 0 ? 240_000 : phase > 0 ? 20_000 : 90_000;
+				if (System.currentTimeMillis() - lastTick > limit) {
 					StringBuilder trace = new StringBuilder();
 					for (StackTraceElement e : renderThread.getStackTrace()) trace.append("\n    at ").append(e);
 					SkyblockPvClient.LOGGER.error("SKYBLOCKPV SELFTEST STALL during {}{}", stage, trace);
@@ -69,6 +71,7 @@ final class SelfTest {
 	private static void tick(Minecraft mc) {
 		lastTick = System.currentTimeMillis();
 		tick++;
+		if (tick % 200 == 1) SkyblockPvClient.LOGGER.info("SKYBLOCKPV SELFTEST tick {} screen {} stage {}", tick, screen, stage);
 		try {
 			run(mc);
 		} catch (RuntimeException e) {
