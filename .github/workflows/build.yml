@@ -26,12 +26,13 @@ jobs:
         run: |
           grep -A4 ': error:' build.log | awk 'BEGIN{RS="--\n"} {gsub(/\n/, "%0A"); print "::error title=javac " "${{ matrix.mc }}" "::" $0}' | head -50
       - name: Show Minecraft API for version differences
-        if: failure()
+        if: always()
         run: |
-          jar=$(find ~/.gradle/caches .gradle -name 'minecraft-*.jar' -path '*${{ matrix.mc }}*' 2>/dev/null | grep -v sources | head -1)
-          echo "::notice title=minecraft jar ${{ matrix.mc }}::${jar:-none} | $(find ~/.gradle/caches .gradle -name 'minecraft*.jar' 2>/dev/null | head -8 | tr '\n' '|')"
-          for c in net.minecraft.client.Minecraft net.minecraft.client.gui.Gui net.minecraft.data.registries.VanillaRegistries net.minecraft.client.multiplayer.ClientPacketListener net.minecraft.client.gui.screens.Screen net.minecraft.client.gui.components.EditBox; do
-            out=$(javap -cp "$jar" "$c" 2>&1 | grep -E 'setScreen|createLookup|registryAccess|getConnection|keyPressed|setHint|setResponder|EditBox\(|class ' | tr '\n' '|' | sed 's/%/%25/g')
+          jar=$(find ~/.gradle/caches/fabric-loom -name 'minecraft-merged.jar' -path '*/${{ matrix.mc }}/*' 2>/dev/null | head -1)
+          [ -n "$jar" ] || { echo "::notice title=api probe ${{ matrix.mc }}::no merged jar"; exit 0; }
+          grep -v '^#' .github/api-probe.txt | while read -r c pattern; do
+            [ -n "$c" ] || continue
+            out=$(javap -p -cp "$jar" "$c" 2>&1 | grep -E "$pattern" | sed 's/^ *//' | tr '\n' '|' | sed 's/%/%25/g')
             echo "::notice title=$c ${{ matrix.mc }}::$out"
           done
       - uses: actions/upload-artifact@v4
